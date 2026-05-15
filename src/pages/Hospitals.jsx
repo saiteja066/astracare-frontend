@@ -60,44 +60,26 @@ export default function Hospitals() {
   // 🚀 FETCH
   const fetchHospitals = async (lat, lng) => {
     setError("");
-    setHospitals([]);
 
     try {
-      const res = await fetch("https://overpass-api.de/api/interpreter", {
-        method: "POST",
-        body: `
-            [out:json];
-            node["amenity"="hospital"](around:4000,${lat},${lng});
-            out;
-          `,
-      });
+      const res = await fetch(
+        "https://astracare-backend.onrender.com/hospitals",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ lat, lng }),
+        },
+      );
 
       const data = await res.json();
-      let results = data.elements || [];
 
-      if (results.length === 0) {
-        const res2 = await fetch("https://overpass-api.de/api/interpreter", {
-          method: "POST",
-          body: `
-              [out:json];
-              node["amenity"="hospital"](around:15000,${lat},${lng});
-              out;
-            `,
-        });
-
-        const data2 = await res2.json();
-        results = data2.elements || [];
-
-        if (results.length > 0) {
-          setError("Showing nearby area hospitals");
-        }
+      if (!data.elements?.length) {
+        setError("⚠️ No hospitals found nearby");
       }
 
-      if (results.length === 0) {
-        setError("❌ No hospitals found");
-      }
-
-      const sorted = results
+      const sorted = data.elements
         .map((h) => ({
           ...h,
           distance: getDistance(lat, lng, h.lat, h.lon),
@@ -106,8 +88,9 @@ export default function Hospitals() {
 
       setHospitals(sorted);
       setCoords({ lat, lng });
-    } catch {
-      setError("❌ API failed");
+    } catch (err) {
+      console.log(err);
+      setError("❌ Hospital service busy, try again");
     }
   };
 
