@@ -1,0 +1,150 @@
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  font-family: Inter, sans-serif;
+  background: radial-gradient(circle at top, #1e293b, #020617);
+  color: white;
+}
+
+/* APP */
+.app {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* SIDEBAR */
+.sidebar {
+  width: 230px;
+  min-width: 230px;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px);
+  padding: 20px;
+}
+
+/* MENU */
+.menu-item {
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+  margin-bottom: 10px;
+  border-radius: 8px;
+  color: #94a3b8;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.menu-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.menu-item.active {
+  background: rgba(96, 165, 250, 0.2);
+  color: #60a5fa;
+}
+
+/* MAIN */
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* HEADER */
+.header {
+  display: flex;
+  justify-content: space-between;
+  padding: 20px;
+}
+
+/* BUTTON */
+.logout-btn {
+  border: 1px solid #f87171;
+  color: #f87171;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: transparent;
+}
+
+/* PAGE */
+.page {
+  flex: 1;
+  overflow: auto;
+  padding: 20px;
+}
+
+/* DASHBOARD LAYOUT */
+.left {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* CARD */
+.card {
+  background: rgba(255, 255, 255, 0.07);
+  padding: 16px;
+  border-radius: 14px;
+}
+.card {
+  overflow: hidden; /* 🔥 prevents chart overflow */
+}
+
+/* MAP */
+.map-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.07);
+  padding: 16px;
+  border-radius: 14px;
+}
+/* 🔥 CHART FIX */
+.chart-card {
+  height: 260px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* VERY IMPORTANT */
+}
+
+.chart-card h3 {
+  flex-shrink: 0;
+  margin-bottom: 10px;
+}
+
+.chart-wrapper {
+  flex: 1;
+  min-height: 0; /* 🔥 KEY FIX */
+}
+/* 🔥 DASHBOARD GRID */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 350px 1fr;
+  gap: 20px;
+  height: 100%;
+}
+
+/* LEFT SIDE */
+.stats-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* RIGHT SIDE */
+.chart-section {
+  display: flex;
+  flex-direction: column;
+}
+.chart-section .card {
+  height: 300px;
+}
+.leaflet-container {
+  height: 100%;
+  width: 100%;
+  border-radius: 12px;
+}
