@@ -9,10 +9,13 @@ export default function Login() {
   const navigate = useNavigate();
 
   const login = async () => {
-    const res = await axios.post("http://localhost:5000/login", {
-      email,
-      password,
-    });
+    const res = await axios.post(
+      "https://astracare-backend.onrender.com/login",
+      {
+        email,
+        password,
+      },
+    );
 
     if (res.data.token) {
       localStorage.setItem("token", res.data.token);

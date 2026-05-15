@@ -2,6 +2,6 @@
 import { io } from "socket.io-client";
 
 // create ONCE, reuse everywhere
-export const socket = io("http://localhost:5000", {
+export const socket = io("https://astracare-backend.onrender.com/", {
   transports: ["websocket"],
 });
