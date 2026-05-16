@@ -25,21 +25,19 @@ export default function Emergency({ setTarget }) {
           lng: user.lng + 0.02,
         };
 
-        // ✅ GLOBAL STATE
-        setTarget({ ambulance });
-
-        // ✅ STORE FOR TRACKING
+        // ✅ STORE DATA (MOST IMPORTANT)
         localStorage.setItem(
           "trackingData",
-          JSON.stringify({
-            user,
-            ambulance,
-            hospital,
-          }),
+          JSON.stringify({ user, ambulance, hospital }),
         );
 
+        // ✅ UPDATE STATE
+        setTarget({ ambulance });
+
         setLoading(false);
-        navigate("/tracking");
+
+        // 🔥 GO TO MAP (NOT tracking)
+        navigate("/map");
       },
       () => {
         alert("Location error");

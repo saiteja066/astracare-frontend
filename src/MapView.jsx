@@ -2,15 +2,15 @@ import {
   MapContainer,
   TileLayer,
   Marker,
-  Popup,
   Polyline,
+  Popup,
 } from "react-leaflet";
 import { useEffect, useState } from "react";
 import { io } from "socket.io-client";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-/* 🔥 FIX MARKER */
+/* FIX ICON */
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl:
@@ -35,24 +35,28 @@ const ambulanceIcon = new L.Icon({
   iconSize: [35, 35],
 });
 
-export default function MapView({ signals = [], target = {} }) {
+export default function MapView() {
   const [vehicles, setVehicles] = useState([]);
   const [route, setRoute] = useState([]);
   const [ambulancePos, setAmbulancePos] = useState(null);
 
-  /* 🚗 SOCKET VEHICLES */
+  /* SOCKET VEHICLES */
   useEffect(() => {
     socket.on("vehicleUpdate", (data) => {
       if (Array.isArray(data)) setVehicles(data);
     });
-
     return () => socket.off("vehicleUpdate");
   }, []);
 
-  /* 📦 LOAD TRACKING DATA */
-  const stored = JSON.parse(localStorage.getItem("trackingData"));
+  /* LOAD DATA */
+  let stored = null;
+  try {
+    stored = JSON.parse(localStorage.getItem("trackingData"));
+  } catch {}
 
-  /* 🛣️ FETCH ROUTE */
+  console.log("MAP DATA:", stored);
+
+  /* FETCH ROUTE */
   useEffect(() => {
     if (!stored?.user || !stored?.ambulance) return;
 
@@ -62,6 +66,8 @@ export default function MapView({ signals = [], target = {} }) {
 
         const res = await fetch(url);
         const result = await res.json();
+
+        console.log("ROUTE:", result);
 
         if (result?.routes?.length > 0) {
           const coords = result.routes[0].geometry.coordinates.map((c) => [
@@ -73,16 +79,16 @@ export default function MapView({ signals = [], target = {} }) {
           setAmbulancePos(coords[0]);
         }
       } catch (err) {
-        console.log("Route error:", err);
+        console.log(err);
       }
     };
 
     fetchRoute();
   }, []);
 
-  /* 🚑 ANIMATION */
+  /* ANIMATE */
   useEffect(() => {
-    if (!Array.isArray(route) || route.length === 0) return;
+    if (!route.length) return;
 
     let i = 0;
 
@@ -112,10 +118,10 @@ export default function MapView({ signals = [], target = {} }) {
       {/* 🛣️ ROUTE */}
       {route.length > 0 && <Polyline positions={route} color="green" />}
 
-      {/* 🚑 MOVING AMBULANCE */}
+      {/* 🚑 AMBULANCE */}
       {ambulancePos && (
         <Marker position={ambulancePos} icon={ambulanceIcon}>
-          <Popup>🚑 Moving Ambulance</Popup>
+          <Popup>🚑 Moving</Popup>
         </Marker>
       )}
     </MapContainer>
