@@ -37,9 +37,9 @@ function getDistance(lat1, lon1, lat2, lon2) {
   return Math.sqrt(dx * dx + dy * dy);
 }
 
-/* LOCAL HOSPITALS (🔥 ADD YOUR OWN HERE) */
+/* LOCAL HOSPITALS */
 const localHospitals = [
-  { name: "Vani Hospital", lat: 16.52, lng: 80.62, city: "Your Area" },
+  { name: "Vani Hospital", lat: 16.52, lng: 80.62, city: "Local Area" },
 ];
 
 export default function MapView() {
@@ -54,7 +54,7 @@ export default function MapView() {
 
   const ambIndex = useRef(0);
 
-  /* 📍 USER LOCATION */
+  /* 📍 GET USER LOCATION */
   useEffect(() => {
     navigator.geolocation.getCurrentPosition((pos) => {
       setUserLocation({
@@ -73,14 +73,14 @@ export default function MapView() {
 
     const fetchHospitals = async () => {
       try {
-        /* 🔥 LOCAL SEARCH FIRST */
+        // 🔥 LOCAL FIRST
         const local = localHospitals.filter((h) =>
           h.name.toLowerCase().includes(query.toLowerCase()),
         );
 
-        /* 🔥 API SEARCH (NEAR USER ONLY) */
+        // 🔥 API (NEARBY)
         const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${query}+hospital&limit=10&viewbox=${userLocation.lng - 0.5},${userLocation.lat + 0.5},${userLocation.lng + 0.5},${userLocation.lat - 0.5}&bounded=1`,
+          `https://nominatim.openstreetmap.org/search?format=json&q=${query}+hospital&limit=10`,
         );
 
         let data = await res.json();
@@ -94,7 +94,7 @@ export default function MapView() {
             city: d.display_name.split(",").slice(-3)[0],
           }));
 
-        /* 🔥 SORT BY DISTANCE */
+        // 🔥 SORT BY DISTANCE
         data.sort((a, b) => {
           const d1 = getDistance(
             userLocation.lat,
@@ -111,7 +111,6 @@ export default function MapView() {
           return d1 - d2;
         });
 
-        /* 🔥 COMBINE (LOCAL FIRST) */
         setResults([...local, ...data]);
       } catch (err) {
         console.log(err);
@@ -122,35 +121,42 @@ export default function MapView() {
     return () => clearTimeout(delay);
   }, [query, userLocation]);
 
-  /* 🚀 ROUTE */
+  /* 🚀 ROUTE FIXED */
   useEffect(() => {
     const data = JSON.parse(localStorage.getItem("trackingData"));
     if (!data || !manualHospital) return;
 
-    const { ambulance } = data;
+    const { user } = data; // ✅ IMPORTANT FIX
 
     const fetchRoute = async () => {
-      const res = await fetch(
-        `https://router.project-osrm.org/route/v1/driving/${ambulance.lng},${ambulance.lat};${manualHospital.lng},${manualHospital.lat}?overview=full&geometries=geojson`,
-      );
+      try {
+        const res = await fetch(
+          `https://router.project-osrm.org/route/v1/driving/${user.lng},${user.lat};${manualHospital.lng},${manualHospital.lat}?overview=full&geometries=geojson`,
+        );
 
-      const json = await res.json();
-      if (!json.routes?.length) return;
+        const json = await res.json();
+        if (!json.routes?.length) return;
 
-      const coords = json.routes[0].geometry.coordinates.map((c) => [
-        c[1],
-        c[0],
-      ]);
+        const coords = json.routes[0].geometry.coordinates.map((c) => [
+          c[1],
+          c[0],
+        ]);
 
-      setRoute(coords);
-      setAmbulancePos(coords[0]);
-      ambIndex.current = 0;
+        setRoute(coords);
+
+        // ✅ START FROM USER
+        setAmbulancePos([user.lat, user.lng]);
+
+        ambIndex.current = 0;
+      } catch (err) {
+        console.log(err);
+      }
     };
 
     fetchRoute();
   }, [manualHospital]);
 
-  /* 🚑 MOVE */
+  /* 🚑 SMOOTH MOVEMENT */
   useEffect(() => {
     if (!route.length) return;
 
@@ -162,7 +168,7 @@ export default function MapView() {
 
       ambIndex.current++;
       setAmbulancePos(route[ambIndex.current]);
-    }, 150);
+    }, 200);
 
     return () => clearInterval(interval);
   }, [route]);
@@ -202,10 +208,14 @@ export default function MapView() {
               <div
                 key={i}
                 onClick={() => {
+                  setRoute([]); // 🔥 reset
+                  ambIndex.current = 0;
+
                   setManualHospital({
                     lat: r.lat,
                     lng: r.lng,
                   });
+
                   setQuery(r.name);
                   setResults([]);
                 }}
@@ -235,19 +245,22 @@ export default function MapView() {
 
         <Follow pos={ambulancePos} />
 
+        {/* ROUTE */}
         {route.length > 0 && (
           <Polyline positions={route} pathOptions={{ color: "green" }} />
         )}
 
+        {/* HOSPITAL */}
         {manualHospital && (
           <Marker
             position={[manualHospital.lat, manualHospital.lng]}
             icon={hospitalIcon}
           >
-            <Popup>🏥 Selected Hospital</Popup>
+            <Popup>🏥 Hospital</Popup>
           </Marker>
         )}
 
+        {/* AMBULANCE */}
         {ambulancePos && (
           <Marker position={ambulancePos} icon={ambulanceIcon}>
             <Popup>🚑 Ambulance</Popup>
