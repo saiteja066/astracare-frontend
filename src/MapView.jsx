@@ -37,18 +37,13 @@ export default function MapView() {
 
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   const ambIndex = useRef(0);
 
-  /* 📦 SAFE LOAD */
-  let data = null;
-  try {
-    data = JSON.parse(localStorage.getItem("trackingData"));
-  } catch {
-    data = null;
-  }
+  const data = JSON.parse(localStorage.getItem("trackingData"));
 
-  const userLat = data?.user?.lat || 17.385; // fallback (Hyderabad)
+  const userLat = data?.user?.lat || 17.385;
   const userLng = data?.user?.lng || 78.486;
 
   /* 🔎 SEARCH */
@@ -60,6 +55,8 @@ export default function MapView() {
 
     const fetchSearch = async () => {
       try {
+        setLoading(true);
+
         const res = await fetch(
           "https://astracare-backend.onrender.com/api/hospitals/search",
           {
@@ -75,16 +72,12 @@ export default function MapView() {
           },
         );
 
-        if (!res.ok) {
-          const text = await res.text();
-          console.error("API ERROR:", text);
-          return;
-        }
-
         const result = await res.json();
         setResults(result.hospitals || []);
       } catch (err) {
-        console.log("Fetch error:", err);
+        console.log(err);
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -119,58 +112,33 @@ export default function MapView() {
 
       ambIndex.current++;
       setAmbulancePos(route[ambIndex.current]);
-    }, 200);
+    }, 150);
 
     return () => clearInterval(interval);
   }, [route]);
 
-  /* 🔘 SEARCH BUTTON */
-  const handleSearch = () => {
-    if (results.length > 0) {
-      const hospital = results[0];
-      setSelectedHospital(hospital);
-      createRoute(hospital);
-      setResults([]);
-    }
-  };
-
   return (
     <div style={{ padding: "20px" }}>
-      <div style={{ maxWidth: "500px", marginBottom: "10px" }}>
-        <div style={{ display: "flex", gap: "10px" }}>
-          <input
-            placeholder="Search hospital..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            style={{
-              flex: 1,
-              padding: "12px",
-              borderRadius: "10px",
-              border: "1px solid #ccc",
-            }}
-          />
+      <input
+        placeholder="Search hospital..."
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+      />
 
-          <button onClick={handleSearch}>Search</button>
+      {loading && <p>Searching...</p>}
+
+      {results.map((r, i) => (
+        <div
+          key={i}
+          onClick={() => {
+            setSelectedHospital(r);
+            createRoute(r);
+            setResults([]);
+          }}
+        >
+          🏥 {r.name}
         </div>
-
-        {results.length > 0 && (
-          <div>
-            {results.map((r, i) => (
-              <div
-                key={i}
-                onClick={() => {
-                  setSelectedHospital(r);
-                  setQuery(r.name);
-                  setResults([]);
-                  createRoute(r);
-                }}
-              >
-                🏥 {r.name}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      ))}
 
       <MapContainer
         center={[userLat, userLng]}
