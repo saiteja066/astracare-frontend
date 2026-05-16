@@ -21,7 +21,7 @@ const hospitalIcon = new L.Icon({
   iconSize: [36, 36],
 });
 
-/* FOLLOW MAP */
+/* FOLLOW */
 function Follow({ pos }) {
   const map = useMap();
   useEffect(() => {
@@ -37,16 +37,10 @@ function getDistance(lat1, lon1, lat2, lon2) {
   return Math.sqrt(dx * dx + dy * dy);
 }
 
-/* CLEAN NAME */
-function getHospitalInfo(display) {
-  const parts = display.split(",");
-
-  return {
-    name: parts[0]?.trim(),
-    area: parts[1]?.trim(),
-    city: parts[parts.length - 3]?.trim(),
-  };
-}
+/* LOCAL HOSPITALS (🔥 ADD YOUR OWN HERE) */
+const localHospitals = [
+  { name: "Vani Hospital", lat: 16.52, lng: 80.62, city: "Your Area" },
+];
 
 export default function MapView() {
   const [route, setRoute] = useState([]);
@@ -55,7 +49,6 @@ export default function MapView() {
 
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
-  const [loading, setLoading] = useState(false);
 
   const [userLocation, setUserLocation] = useState(null);
 
@@ -73,54 +66,59 @@ export default function MapView() {
 
   /* 🔎 SEARCH */
   useEffect(() => {
-    if (query.length < 3 || !userLocation) {
+    if (query.length < 2 || !userLocation) {
       setResults([]);
       return;
     }
 
     const fetchHospitals = async () => {
-      setLoading(true);
-
       try {
+        /* 🔥 LOCAL SEARCH FIRST */
+        const local = localHospitals.filter((h) =>
+          h.name.toLowerCase().includes(query.toLowerCase()),
+        );
+
+        /* 🔥 API SEARCH (NEAR USER ONLY) */
         const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${query}+hospital&limit=10`,
+          `https://nominatim.openstreetmap.org/search?format=json&q=${query}+hospital&limit=10&viewbox=${userLocation.lng - 0.5},${userLocation.lat + 0.5},${userLocation.lng + 0.5},${userLocation.lat - 0.5}&bounded=1`,
         );
 
         let data = await res.json();
 
-        // filter hospitals
-        data = data.filter((d) =>
-          d.display_name.toLowerCase().includes("hospital"),
-        );
+        data = data
+          .filter((d) => d.display_name.toLowerCase().includes("hospital"))
+          .map((d) => ({
+            name: d.display_name.split(",")[0],
+            lat: parseFloat(d.lat),
+            lng: parseFloat(d.lon),
+            city: d.display_name.split(",").slice(-3)[0],
+          }));
 
-        // sort nearest
+        /* 🔥 SORT BY DISTANCE */
         data.sort((a, b) => {
           const d1 = getDistance(
             userLocation.lat,
             userLocation.lng,
-            parseFloat(a.lat),
-            parseFloat(a.lon),
+            a.lat,
+            a.lng,
           );
-
           const d2 = getDistance(
             userLocation.lat,
             userLocation.lng,
-            parseFloat(b.lat),
-            parseFloat(b.lon),
+            b.lat,
+            b.lng,
           );
-
           return d1 - d2;
         });
 
-        setResults(data);
+        /* 🔥 COMBINE (LOCAL FIRST) */
+        setResults([...local, ...data]);
       } catch (err) {
         console.log(err);
       }
-
-      setLoading(false);
     };
 
-    const delay = setTimeout(fetchHospitals, 400);
+    const delay = setTimeout(fetchHospitals, 300);
     return () => clearTimeout(delay);
   }, [query, userLocation]);
 
@@ -169,55 +167,23 @@ export default function MapView() {
     return () => clearInterval(interval);
   }, [route]);
 
-  /* 🔘 SEARCH BUTTON */
-  const handleSearch = () => {
-    if (!results.length) return;
-
-    const best = results[0];
-    const info = getHospitalInfo(best.display_name);
-
-    setManualHospital({
-      lat: parseFloat(best.lat),
-      lng: parseFloat(best.lon),
-    });
-
-    setQuery(info.name);
-    setResults([]);
-  };
-
   return (
     <div style={{ padding: "10px" }}>
       {/* 🔎 SEARCH */}
       <div style={{ position: "relative", maxWidth: "450px" }}>
-        <div style={{ display: "flex", gap: "8px" }}>
-          <input
-            placeholder="Search hospitals..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            style={{
-              flex: 1,
-              padding: "12px",
-              borderRadius: "12px",
-              border: "1px solid #ccc",
-            }}
-          />
+        <input
+          placeholder="Search hospitals..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          style={{
+            width: "100%",
+            padding: "12px",
+            borderRadius: "12px",
+            border: "1px solid #ccc",
+          }}
+        />
 
-          <button
-            onClick={handleSearch}
-            style={{
-              padding: "12px 18px",
-              borderRadius: "12px",
-              border: "none",
-              background: "#2563eb",
-              color: "white",
-              cursor: "pointer",
-            }}
-          >
-            Search
-          </button>
-        </div>
-
-        {/* SUGGESTIONS */}
+        {/* RESULTS */}
         {results.length > 0 && (
           <div
             style={{
@@ -228,42 +194,35 @@ export default function MapView() {
               marginTop: "5px",
               boxShadow: "0 4px 10px rgba(0,0,0,0.1)",
               zIndex: 1000,
-              maxHeight: "220px",
+              maxHeight: "200px",
               overflowY: "auto",
             }}
           >
-            {results.map((r, i) => {
-              const info = getHospitalInfo(r.display_name);
-
-              return (
-                <div
-                  key={i}
-                  onClick={() => {
-                    setManualHospital({
-                      lat: parseFloat(r.lat),
-                      lng: parseFloat(r.lon),
-                    });
-
-                    setQuery(info.name);
-                    setResults([]);
-                  }}
-                  style={{
-                    padding: "12px",
-                    cursor: "pointer",
-                    borderBottom: "1px solid #eee",
-                  }}
-                >
-                  🏥 <b>{info.name}</b>
-                  <div style={{ fontSize: "12px", color: "#666" }}>
-                    📍 {info.area}, {info.city}
-                  </div>
+            {results.map((r, i) => (
+              <div
+                key={i}
+                onClick={() => {
+                  setManualHospital({
+                    lat: r.lat,
+                    lng: r.lng,
+                  });
+                  setQuery(r.name);
+                  setResults([]);
+                }}
+                style={{
+                  padding: "10px",
+                  cursor: "pointer",
+                  borderBottom: "1px solid #eee",
+                }}
+              >
+                🏥 <b>{r.name}</b>
+                <div style={{ fontSize: "12px", color: "#666" }}>
+                  📍 {r.city}
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         )}
-
-        {loading && <div style={{ fontSize: "12px" }}>Searching...</div>}
       </div>
 
       {/* MAP */}
@@ -276,12 +235,10 @@ export default function MapView() {
 
         <Follow pos={ambulancePos} />
 
-        {/* ROUTE */}
         {route.length > 0 && (
           <Polyline positions={route} pathOptions={{ color: "green" }} />
         )}
 
-        {/* HOSPITAL */}
         {manualHospital && (
           <Marker
             position={[manualHospital.lat, manualHospital.lng]}
@@ -291,7 +248,6 @@ export default function MapView() {
           </Marker>
         )}
 
-        {/* AMBULANCE */}
         {ambulancePos && (
           <Marker position={ambulancePos} icon={ambulanceIcon}>
             <Popup>🚑 Ambulance</Popup>
