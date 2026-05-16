@@ -5,7 +5,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet.heat";
 
-/* 🔥 FIX MARKER ICON */
+/* 🔥 FIX MARKER ICON (CORRECTED) */
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl:
@@ -14,7 +14,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
 
-/* 🔌 SOCKET (FIXED) */
+/* 🔌 SOCKET */
 const socket = io("https://astracare-backend.onrender.com", {
   transports: ["polling", "websocket"],
 });
@@ -39,15 +39,21 @@ const ambulanceIcon = new L.Icon({
 
 /* 🚦 TRAFFIC */
 function getTrafficLevel(vehicles, lat, lng) {
-  if (!vehicles || vehicles.length === 0) return "green";
+  if (!Array.isArray(vehicles) || vehicles.length === 0) return "green";
 
   const nearby = vehicles.filter(
-    (v) => Math.abs(v.lat - lat) < 0.01 && Math.abs(v.lng - lng) < 0.01,
+    (v) =>
+      v &&
+      typeof v.lat === "number" &&
+      typeof v.lng === "number" &&
+      Math.abs(v.lat - lat) < 0.01 &&
+      Math.abs(v.lng - lng) < 0.01,
   );
 
   if (!nearby.length) return "green";
 
-  const avgSpeed = nearby.reduce((sum, v) => sum + v.speed, 0) / nearby.length;
+  const avgSpeed =
+    nearby.reduce((sum, v) => sum + (v.speed || 0), 0) / nearby.length;
 
   const score = nearby.length / (avgSpeed || 1);
 
@@ -62,17 +68,31 @@ function getSignalIcon(status) {
   return greenSignal;
 }
 
-/* 🔥 HEATMAP */
+/* 🔥 SAFE HEATMAP */
 function Heatmap({ vehicles }) {
   const map = useMap();
 
   useEffect(() => {
-    if (!vehicles || vehicles.length === 0) return;
+    if (!Array.isArray(vehicles)) return;
 
-    const heatLayer = L.heatLayer(
-      vehicles.map((v) => [v.lat, v.lng, v.speed < 15 ? 1 : 0.3]),
-      { radius: 25, blur: 15 },
+    const valid = vehicles.filter(
+      (v) => v && typeof v.lat === "number" && typeof v.lng === "number",
     );
+
+    if (valid.length === 0) return;
+
+    const heatData = valid.map((v) => [
+      v.lat,
+      v.lng,
+      v.speed && v.speed < 15 ? 1 : 0.3,
+    ]);
+
+    if (heatData.length === 0) return;
+
+    const heatLayer = L.heatLayer(heatData, {
+      radius: 25,
+      blur: 15,
+    });
 
     heatLayer.addTo(map);
 
@@ -84,7 +104,6 @@ function Heatmap({ vehicles }) {
 
 export default function MapView({ signals = [], target = {} }) {
   const [vehicles, setVehicles] = useState([
-    // 🔥 fallback (IMPORTANT)
     { lat: 17.22, lng: 78.22, speed: 20 },
     { lat: 17.24, lng: 78.23, speed: 10 },
   ]);
@@ -93,7 +112,7 @@ export default function MapView({ signals = [], target = {} }) {
     socket.on("vehicleUpdate", (data) => {
       console.log("Socket:", data);
 
-      if (data && Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data) && data.length > 0) {
         setVehicles(data);
       }
     });
@@ -105,14 +124,16 @@ export default function MapView({ signals = [], target = {} }) {
     <MapContainer center={[17.24, 78.24]} zoom={12} style={{ height: "500px" }}>
       <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
+      {/* 🔥 HEATMAP */}
       <Heatmap vehicles={vehicles} />
 
       {/* 🚗 VEHICLES */}
-      {vehicles.map((v, i) => (
-        <Marker key={i} position={[v.lat, v.lng]}>
-          <Popup>🚗 {v.speed.toFixed(1)} km/h</Popup>
-        </Marker>
-      ))}
+      {Array.isArray(vehicles) &&
+        vehicles.map((v, i) => (
+          <Marker key={i} position={[v.lat, v.lng]}>
+            <Popup>🚗 {v.speed?.toFixed(1)} km/h</Popup>
+          </Marker>
+        ))}
 
       {/* 🚦 SIGNALS */}
       {signals.map((s, i) => {
