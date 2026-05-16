@@ -37,26 +37,22 @@ export default function MapView() {
 
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
-  const [loading, setLoading] = useState(false);
 
   const ambIndex = useRef(0);
 
-  const data = JSON.parse(localStorage.getItem("trackingData"));
-
-  const userLat = data?.user?.lat || 17.385;
-  const userLng = data?.user?.lng || 78.486;
+  /* 📍 DEFAULT LOCATION */
+  const userLat = 17.385;
+  const userLng = 78.486;
 
   /* 🔎 SEARCH */
   useEffect(() => {
-    if (!data?.user || query.length < 2) {
+    if (query.length < 2) {
       setResults([]);
       return;
     }
 
     const fetchSearch = async () => {
       try {
-        setLoading(true);
-
         const res = await fetch(
           "https://astracare-backend.onrender.com/api/hospitals/search",
           {
@@ -72,12 +68,10 @@ export default function MapView() {
           },
         );
 
-        const result = await res.json();
-        setResults(result.hospitals || []);
+        const data = await res.json();
+        setResults(data.hospitals || []);
       } catch (err) {
         console.log(err);
-      } finally {
-        setLoading(false);
       }
     };
 
@@ -124,8 +118,6 @@ export default function MapView() {
         value={query}
         onChange={(e) => setQuery(e.target.value)}
       />
-
-      {loading && <p>Searching...</p>}
 
       {results.map((r, i) => (
         <div
