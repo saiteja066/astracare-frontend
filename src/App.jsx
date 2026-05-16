@@ -19,6 +19,14 @@ import Sidebar from "./Sidebar";
 function App() {
   const [target, setTarget] = useState(null);
 
+  /* 🚗 STATIC VEHICLES (IMPORTANT) */
+  const vehicles = [
+    { id: 1, lat: 17.22, lng: 78.22 },
+    { id: 2, lat: 17.25, lng: 78.25 },
+    { id: 3, lat: 17.26, lng: 78.24 },
+  ];
+
+  /* 🚦 SIGNALS */
   const signals = [
     { id: 1, lat: 17.22, lng: 78.22 },
     { id: 2, lat: 17.26, lng: 78.27 },
@@ -64,7 +72,7 @@ function App() {
               path="/"
               element={
                 <ProtectedRoute>
-                  <Dashboard signals={signals} />
+                  <Dashboard vehicles={vehicles} signals={signals} />
                 </ProtectedRoute>
               }
             />
@@ -73,7 +81,11 @@ function App() {
               path="/map"
               element={
                 <ProtectedRoute>
-                  <MapPage signals={signals} target={target} />
+                  <MapPage
+                    vehicles={vehicles}
+                    signals={signals}
+                    target={target}
+                  />
                 </ProtectedRoute>
               }
             />
@@ -82,7 +94,7 @@ function App() {
               path="/analytics"
               element={
                 <ProtectedRoute>
-                  <Analytics />
+                  <Analytics vehicles={vehicles} />
                 </ProtectedRoute>
               }
             />

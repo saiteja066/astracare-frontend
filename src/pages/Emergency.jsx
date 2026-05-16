@@ -35,6 +35,8 @@ export default function Emergency() {
         // ✅ store data
         localStorage.setItem("trackingData", JSON.stringify(data));
 
+        setLoading(false); // ✅ IMPORTANT FIX
+
         // ✅ go to tracking page
         navigate("/tracking");
       },
@@ -56,6 +58,7 @@ export default function Emergency() {
 
         <button
           onClick={handleEmergency}
+          disabled={loading} // ✅ prevents double click
           style={{
             padding: "15px 25px",
             borderRadius: "12px",

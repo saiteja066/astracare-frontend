@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-export default function Dashboard({ vehicles, signals }) {
+export default function Dashboard({ vehicles = [], signals = [] }) {
   const [vCount, setVCount] = useState(0);
   const [sCount, setSCount] = useState(0);
 
@@ -8,18 +8,14 @@ export default function Dashboard({ vehicles, signals }) {
     let v = 0;
     let s = 0;
 
-    // ✅ SAFE LENGTH
-    const vLen = Array.isArray(vehicles) ? vehicles.length : 0;
-    const sLen = Array.isArray(signals) ? signals.length : 0;
-
     const interval = setInterval(() => {
-      if (v < vLen) v++;
-      if (s < sLen) s++;
+      if (v < vehicles.length) v++;
+      if (s < signals.length) s++;
 
       setVCount(v);
       setSCount(s);
 
-      if (v === vLen && s === sLen) {
+      if (v === vehicles.length && s === signals.length) {
         clearInterval(interval);
       }
     }, 200);

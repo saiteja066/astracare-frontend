@@ -11,7 +11,6 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
 
-/* ICONS */
 const vehicleIcon = new L.Icon({
   iconUrl: "https://cdn-icons-png.flaticon.com/512/743/743922.png",
   iconSize: [25, 25],
@@ -27,19 +26,14 @@ const signalIcon = new L.Icon({
   iconSize: [25, 25],
 });
 
-export default function MapView({ signals = [], target = {} }) {
-  const vehicles = [
-    { id: 1, lat: 17.22, lng: 78.22 },
-    { id: 2, lat: 17.25, lng: 78.25 },
-  ];
-
+export default function MapView({ vehicles = [], signals = [], target = {} }) {
   return (
-    <MapContainer center={[17.24, 78.24]} zoom={13} style={{ height: "500px" }}>
+    <MapContainer center={[17.24, 78.24]} zoom={13} style={{ height: "100%" }}>
       <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
       {vehicles.map((v) => (
         <Marker key={v.id} position={[v.lat, v.lng]} icon={vehicleIcon}>
-          <Popup>🚗 Car</Popup>
+          <Popup>🚗 Vehicle</Popup>
         </Marker>
       ))}
 
