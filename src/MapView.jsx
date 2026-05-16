@@ -21,7 +21,7 @@ const hospitalIcon = new L.Icon({
   iconSize: [36, 36],
 });
 
-/* FOLLOW */
+/* FOLLOW MAP */
 function Follow({ pos }) {
   const map = useMap();
   useEffect(() => {
@@ -37,6 +37,17 @@ function getDistance(lat1, lon1, lat2, lon2) {
   return Math.sqrt(dx * dx + dy * dy);
 }
 
+/* CLEAN NAME */
+function getHospitalInfo(display) {
+  const parts = display.split(",");
+
+  return {
+    name: parts[0]?.trim(),
+    area: parts[1]?.trim(),
+    city: parts[parts.length - 3]?.trim(),
+  };
+}
+
 export default function MapView() {
   const [route, setRoute] = useState([]);
   const [ambulancePos, setAmbulancePos] = useState(null);
@@ -50,7 +61,7 @@ export default function MapView() {
 
   const ambIndex = useRef(0);
 
-  /* 📍 GET USER LOCATION */
+  /* 📍 USER LOCATION */
   useEffect(() => {
     navigator.geolocation.getCurrentPosition((pos) => {
       setUserLocation({
@@ -77,11 +88,12 @@ export default function MapView() {
 
         let data = await res.json();
 
+        // filter hospitals
         data = data.filter((d) =>
           d.display_name.toLowerCase().includes("hospital"),
         );
 
-        // sort by distance
+        // sort nearest
         data.sort((a, b) => {
           const d1 = getDistance(
             userLocation.lat,
@@ -112,7 +124,7 @@ export default function MapView() {
     return () => clearTimeout(delay);
   }, [query, userLocation]);
 
-  /* 🚀 ROUTE FETCH */
+  /* 🚀 ROUTE */
   useEffect(() => {
     const data = JSON.parse(localStorage.getItem("trackingData"));
     if (!data || !manualHospital) return;
@@ -125,7 +137,6 @@ export default function MapView() {
       );
 
       const json = await res.json();
-
       if (!json.routes?.length) return;
 
       const coords = json.routes[0].geometry.coordinates.map((c) => [
@@ -163,19 +174,20 @@ export default function MapView() {
     if (!results.length) return;
 
     const best = results[0];
+    const info = getHospitalInfo(best.display_name);
 
     setManualHospital({
       lat: parseFloat(best.lat),
       lng: parseFloat(best.lon),
     });
 
-    setQuery(best.display_name);
+    setQuery(info.name);
     setResults([]);
   };
 
   return (
     <div style={{ padding: "10px" }}>
-      {/* 🔎 SEARCH UI */}
+      {/* 🔎 SEARCH */}
       <div style={{ position: "relative", maxWidth: "450px" }}>
         <div style={{ display: "flex", gap: "8px" }}>
           <input
@@ -205,7 +217,7 @@ export default function MapView() {
           </button>
         </div>
 
-        {/* RESULTS */}
+        {/* SUGGESTIONS */}
         {results.length > 0 && (
           <div
             style={{
@@ -216,14 +228,12 @@ export default function MapView() {
               marginTop: "5px",
               boxShadow: "0 4px 10px rgba(0,0,0,0.1)",
               zIndex: 1000,
-              maxHeight: "200px",
+              maxHeight: "220px",
               overflowY: "auto",
             }}
           >
             {results.map((r, i) => {
-              const parts = r.display_name.split(",");
-              const name = parts[0];
-              const city = parts[parts.length - 3] || "";
+              const info = getHospitalInfo(r.display_name);
 
               return (
                 <div
@@ -233,18 +243,19 @@ export default function MapView() {
                       lat: parseFloat(r.lat),
                       lng: parseFloat(r.lon),
                     });
-                    setQuery(r.display_name);
+
+                    setQuery(info.name);
                     setResults([]);
                   }}
                   style={{
-                    padding: "10px",
+                    padding: "12px",
                     cursor: "pointer",
                     borderBottom: "1px solid #eee",
                   }}
                 >
-                  🏥 <b>{name}</b>
+                  🏥 <b>{info.name}</b>
                   <div style={{ fontSize: "12px", color: "#666" }}>
-                    📍 {city}
+                    📍 {info.area}, {info.city}
                   </div>
                 </div>
               );
