@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
+import { useNavigate } from "react-router-dom";
 
 export default function Hospitals() {
   const [hospitals, setHospitals] = useState([]);
@@ -9,6 +10,8 @@ export default function Hospitals() {
   const [error, setError] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const navigate = useNavigate();
 
   /* 📏 DISTANCE */
   function getDistance(lat1, lon1, lat2, lon2) {
@@ -25,7 +28,7 @@ export default function Hospitals() {
     return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
 
-  /* 🚀 FETCH */
+  /* 🚀 FETCH HOSPITALS */
   const fetchHospitals = async (lat, lng) => {
     setError("");
     setLoading(true);
@@ -78,7 +81,7 @@ export default function Hospitals() {
     );
   }, [loaded]);
 
-  /* 🔍 SEARCH */
+  /* 🔍 SEARCH LOCATION */
   const handleSearch = async () => {
     if (!place) return;
 
@@ -108,6 +111,22 @@ export default function Hospitals() {
 
     return null;
   }
+
+  /* 🚑 BOOK AMBULANCE (RESTORED CORE FEATURE) */
+  const handleRoute = (h) => {
+    const data = {
+      user: coords,
+      hospital: { lat: h.lat, lng: h.lng },
+      ambulance: {
+        lat: coords.lat,
+        lng: coords.lng,
+      },
+    };
+
+    localStorage.setItem("trackingData", JSON.stringify(data));
+
+    navigate("/tracking");
+  };
 
   return (
     <div>
@@ -157,34 +176,40 @@ export default function Hospitals() {
         </div>
       )}
 
-      {/* 🏥 CARDS (ZOMATO STYLE) */}
-      {hospitals.map((h, i) => {
-        const rating = (4 + Math.random()).toFixed(1);
+      {/* 🏥 LIST WITH BOOK BUTTON (RESTORED) */}
+      {hospitals.map((h, i) => (
+        <div
+          key={i}
+          style={{
+            background: "#1e293b",
+            color: "white",
+            padding: "15px",
+            borderRadius: "12px",
+            marginBottom: "15px",
+          }}
+        >
+          <h3>🏥 {h.name}</h3>
 
-        return (
-          <div
-            key={i}
+          <p style={{ color: "#22c55e" }}>📍 {h.distance.toFixed(2)} km away</p>
+
+          <button
+            onClick={() => handleRoute(h)}
             style={{
-              background: "#1e293b",
+              marginTop: "10px",
+              padding: "10px",
+              width: "100%",
+              borderRadius: "10px",
+              border: "none",
+              background: "#ef4444",
               color: "white",
-              padding: "15px",
-              borderRadius: "12px",
-              marginBottom: "15px",
-              boxShadow: "0 5px 15px rgba(0,0,0,0.2)",
+              fontWeight: "bold",
+              cursor: "pointer",
             }}
           >
-            <h3>🏥 {h.name}</h3>
-
-            <p style={{ color: "#94a3b8" }}>Multi-speciality Hospital</p>
-
-            <p>⭐ {rating} | 100+ reviews</p>
-
-            <p style={{ color: "#22c55e" }}>
-              📍 {h.distance.toFixed(2)} km away
-            </p>
-          </div>
-        );
-      })}
+            🚑 Book Ambulance
+          </button>
+        </div>
+      ))}
     </div>
   );
 }
