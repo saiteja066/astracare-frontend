@@ -33,69 +33,64 @@ function Follow({ pos }) {
 export default function MapView() {
   const [route, setRoute] = useState([]);
   const [ambulancePos, setAmbulancePos] = useState(null);
-  const [manualHospital, setManualHospital] = useState(null);
+  const [selectedHospital, setSelectedHospital] = useState(null);
 
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
 
   const ambIndex = useRef(0);
 
-  /* 📦 LOAD DATA */
-  useEffect(() => {
-    const data = JSON.parse(localStorage.getItem("trackingData"));
-    if (data) {
-      setManualHospital(data.hospital);
-      setAmbulancePos([data.user.lat, data.user.lng]);
-    }
-  }, []);
+  /* 📦 LOAD USER */
+  const data = JSON.parse(localStorage.getItem("trackingData"));
 
-  /* 🔎 SEARCH */
+  /* 🔎 SEARCH (ONLY WHEN TYPING) */
   useEffect(() => {
-    const data = JSON.parse(localStorage.getItem("trackingData"));
-    if (!data || query.length < 2) return;
+    if (!data || query.length < 2) {
+      setResults([]);
+      return;
+    }
 
     const fetchSearch = async () => {
-      const res = await fetch("http://localhost:5000/api/hospitals/search", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          lat: data.user.lat,
-          lng: data.user.lng,
-          query,
-        }),
-      });
+      try {
+        const res = await fetch("http://localhost:5000/api/hospitals/search", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            lat: data.user.lat,
+            lng: data.user.lng,
+            query,
+          }),
+        });
 
-      const result = await res.json();
-      setResults(result.hospitals);
+        const result = await res.json();
+        setResults(result.hospitals || []);
+      } catch (err) {
+        console.log(err);
+      }
     };
 
     const delay = setTimeout(fetchSearch, 400);
     return () => clearTimeout(delay);
   }, [query]);
 
-  /* 🚀 ROUTE */
-  useEffect(() => {
-    const data = JSON.parse(localStorage.getItem("trackingData"));
-    if (!data || !manualHospital) return;
+  /* 🚀 ROUTE ONLY AFTER SELECT */
+  const createRoute = async (hospital) => {
+    if (!data) return;
 
-    const fetchRoute = async () => {
-      const res = await fetch(
-        `https://router.project-osrm.org/route/v1/driving/${data.user.lng},${data.user.lat};${manualHospital.lng},${manualHospital.lat}?overview=full&geometries=geojson`,
-      );
+    const res = await fetch(
+      `https://router.project-osrm.org/route/v1/driving/${data.user.lng},${data.user.lat};${hospital.lng},${hospital.lat}?overview=full&geometries=geojson`,
+    );
 
-      const json = await res.json();
+    const json = await res.json();
 
-      const coords = json.routes[0].geometry.coordinates.map((c) => [
-        c[1],
-        c[0],
-      ]);
+    const coords = json.routes[0].geometry.coordinates.map((c) => [c[1], c[0]]);
 
-      setRoute(coords);
-      ambIndex.current = 0;
-    };
-
-    fetchRoute();
-  }, [manualHospital]);
+    setRoute(coords);
+    setAmbulancePos([data.user.lat, data.user.lng]);
+    ambIndex.current = 0;
+  };
 
   /* 🚑 MOVE */
   useEffect(() => {
@@ -114,54 +109,113 @@ export default function MapView() {
     return () => clearInterval(interval);
   }, [route]);
 
+  /* 🔘 SEARCH BUTTON */
+  const handleSearch = () => {
+    if (results.length > 0) {
+      const hospital = results[0]; // best match
+      setSelectedHospital(hospital);
+      createRoute(hospital);
+      setResults([]);
+    }
+  };
+
   return (
-    <div style={{ padding: "10px" }}>
-      {/* 🔎 SEARCH */}
-      <input
-        placeholder="Search hospital..."
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-      />
+    <div style={{ padding: "20px" }}>
+      {/* 🔥 CLEAN SEARCH BAR */}
+      <div style={{ maxWidth: "500px", marginBottom: "10px" }}>
+        <div style={{ display: "flex", gap: "10px" }}>
+          <input
+            placeholder="Search hospital..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            style={{
+              flex: 1,
+              padding: "12px",
+              borderRadius: "10px",
+              border: "1px solid #ccc",
+              fontSize: "14px",
+            }}
+          />
 
-      {results.map((r, i) => (
-        <div
-          key={i}
-          onClick={() => {
-            setManualHospital(r);
-            setQuery(r.name);
-            setResults([]);
-          }}
-        >
-          🏥 {r.name}
+          <button
+            onClick={handleSearch}
+            style={{
+              padding: "12px 20px",
+              borderRadius: "10px",
+              border: "none",
+              background: "#2563eb",
+              color: "white",
+              cursor: "pointer",
+              fontWeight: "bold",
+            }}
+          >
+            Search
+          </button>
         </div>
-      ))}
 
-      {/* MAP */}
+        {/* 🔥 SUGGESTIONS */}
+        {results.length > 0 && (
+          <div
+            style={{
+              background: "white",
+              borderRadius: "10px",
+              marginTop: "5px",
+              boxShadow: "0 4px 10px rgba(0,0,0,0.1)",
+              maxHeight: "200px",
+              overflowY: "auto",
+            }}
+          >
+            {results.map((r, i) => (
+              <div
+                key={i}
+                onClick={() => {
+                  setSelectedHospital(r);
+                  setQuery(r.name);
+                  setResults([]);
+                  createRoute(r);
+                }}
+                style={{
+                  padding: "10px",
+                  cursor: "pointer",
+                  borderBottom: "1px solid #eee",
+                }}
+              >
+                🏥 {r.name}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* 🗺️ MAP */}
       <MapContainer
-        center={[17.24, 78.24]}
+        center={[data?.user.lat || 17.24, data?.user.lng || 78.24]}
         zoom={13}
-        style={{ height: "500px" }}
+        style={{ height: "500px", borderRadius: "15px" }}
       >
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
         <Follow pos={ambulancePos} />
 
+        {/* ROUTE */}
         {route.length > 0 && (
-          <Polyline positions={route} pathOptions={{ color: "green" }} />
+          <Polyline positions={route} pathOptions={{ color: "#22c55e" }} />
         )}
 
-        {manualHospital && (
+        {/* HOSPITAL */}
+        {selectedHospital && (
           <Marker
-            position={[manualHospital.lat, manualHospital.lng]}
+            position={[selectedHospital.lat, selectedHospital.lng]}
             icon={hospitalIcon}
           >
-            <Popup>{manualHospital.name}</Popup>
+            <Popup>{selectedHospital.name}</Popup>
           </Marker>
         )}
 
+        {/* AMBULANCE */}
         {ambulancePos && (
           <Marker position={ambulancePos} icon={ambulanceIcon}>
-            <Popup>Ambulance</Popup>
+            <Popup>🚑 Ambulance</Popup>
           </Marker>
         )}
       </MapContainer>
