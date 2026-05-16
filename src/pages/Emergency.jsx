@@ -1,58 +1,30 @@
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 export default function Emergency() {
-  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleEmergency = () => {
-    setLoading(true);
-
-    navigator.geolocation.getCurrentPosition(async (pos) => {
+    navigator.geolocation.getCurrentPosition((pos) => {
       const user = {
         lat: pos.coords.latitude,
         lng: pos.coords.longitude,
       };
 
-      try {
-        const res = await fetch(
-          "https://astracare-backend.onrender.com/api/hospitals",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(user),
-          },
-        );
+      const hospital = {
+        lat: user.lat + 0.02,
+        lng: user.lng + 0.02,
+      };
 
-        const data = await res.json();
+      localStorage.setItem("trackingData", JSON.stringify({ user, hospital }));
 
-        const hospital = data.hospitals[0];
-
-        const trackingData = {
-          user,
-          hospital,
-          ambulance: user,
-        };
-
-        localStorage.setItem("trackingData", JSON.stringify(trackingData));
-
-        navigate("/map");
-      } catch (err) {
-        console.log(err);
-      }
-
-      setLoading(false);
+      navigate("/map");
     });
   };
 
   return (
-    <div>
+    <div style={{ textAlign: "center", padding: "50px", color: "white" }}>
       <h2>🚨 Emergency</h2>
-      <button onClick={handleEmergency}>
-        {loading ? "Loading..." : "Request Ambulance"}
-      </button>
+      <button onClick={handleEmergency}>🚑 Request Ambulance</button>
     </div>
   );
 }

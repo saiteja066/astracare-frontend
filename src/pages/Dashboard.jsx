@@ -1,48 +1,18 @@
-import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
-export default function Dashboard({ vehicles = [], signals = [] }) {
-  const [vCount, setVCount] = useState(0);
-  const [sCount, setSCount] = useState(0);
-
-  useEffect(() => {
-    let v = 0;
-    let s = 0;
-
-    const interval = setInterval(() => {
-      if (v < vehicles.length) v++;
-      if (s < signals.length) s++;
-
-      setVCount(v);
-      setSCount(s);
-
-      if (v === vehicles.length && s === signals.length) {
-        clearInterval(interval);
-      }
-    }, 150);
-
-    return () => clearInterval(interval);
-  }, [vehicles, signals]);
+export default function Dashboard() {
+  const navigate = useNavigate();
 
   return (
-    <div>
-      <h2>🚦 Dashboard</h2>
+    <div style={{ textAlign: "center", padding: "50px", color: "white" }}>
+      <h1>🚦 Dashboard</h1>
 
-      <div style={{ display: "flex", gap: "20px" }}>
-        <div className="card">
-          <h3>Vehicles</h3>
-          <h1>{vCount}</h1>
-        </div>
+      <button onClick={() => navigate("/emergency")}>🚨 Emergency</button>
 
-        <div className="card">
-          <h3>Signals</h3>
-          <h1>{sCount}</h1>
-        </div>
+      <br />
+      <br />
 
-        <div className="card">
-          <h3>Emergency</h3>
-          <h1>🚑 Active</h1>
-        </div>
-      </div>
+      <button onClick={() => navigate("/map")}>🗺️ Open Map</button>
     </div>
   );
 }
