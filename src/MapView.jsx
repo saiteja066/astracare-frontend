@@ -1,13 +1,14 @@
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import { useEffect, useState } from "react";
 import { io } from "socket.io-client";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet.heat";
 
+/* 🔌 SOCKET */
 const socket = io("https://astracare-backend.onrender.com");
 
-/* 🚦 Signal Icons */
+/* 🚦 SIGNAL ICONS */
 const redSignal = new L.Icon({
   iconUrl: "https://cdn-icons-png.flaticon.com/512/463/463612.png",
   iconSize: [25, 25],
@@ -23,6 +24,7 @@ const greenSignal = new L.Icon({
   iconSize: [25, 25],
 });
 
+/* 🚑 ICON */
 const ambulanceIcon = new L.Icon({
   iconUrl: "https://cdn-icons-png.flaticon.com/512/2967/2967350.png",
   iconSize: [35, 35],
@@ -51,19 +53,10 @@ function getSignalIcon(status) {
   return greenSignal;
 }
 
-export default function MapView({ signals, target }) {
-  const [vehicles, setVehicles] = useState([]);
+/* 🔥 HEATMAP COMPONENT (FIXED) */
+function Heatmap({ vehicles }) {
+  const map = useMap();
 
-  /* 🚗 LIVE VEHICLES */
-  useEffect(() => {
-    socket.on("vehicleUpdate", (data) => {
-      setVehicles(data);
-    });
-
-    return () => socket.off("vehicleUpdate");
-  }, []);
-
-  /* 🔥 HEATMAP */
   useEffect(() => {
     if (!vehicles.length) return;
 
@@ -73,23 +66,43 @@ export default function MapView({ signals, target }) {
       v.speed < 15 ? 1 : 0.3,
     ]);
 
-    const heat = L.heatLayer(heatData, {
+    const heatLayer = L.heatLayer(heatData, {
       radius: 25,
       blur: 15,
     });
 
+    heatLayer.addTo(map);
+
     return () => {
-      heat.remove();
+      map.removeLayer(heatLayer);
     };
-  }, [vehicles]);
+  }, [vehicles, map]);
+
+  return null;
+}
+
+export default function MapView({ signals = [], target }) {
+  const [vehicles, setVehicles] = useState([]);
+
+  /* 🚗 SOCKET DATA */
+  useEffect(() => {
+    socket.on("vehicleUpdate", (data) => {
+      setVehicles(data);
+    });
+
+    return () => socket.off("vehicleUpdate");
+  }, []);
 
   return (
     <MapContainer
       center={[17.385, 78.4867]}
       zoom={13}
-      style={{ height: "500px" }}
+      style={{ height: "500px", width: "100%" }}
     >
       <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+
+      {/* 🔥 HEATMAP */}
+      <Heatmap vehicles={vehicles} />
 
       {/* 🚗 VEHICLES */}
       {vehicles.map((v, i) => (
@@ -98,7 +111,7 @@ export default function MapView({ signals, target }) {
         </Marker>
       ))}
 
-      {/* 🚦 SIGNALS WITH TRAFFIC */}
+      {/* 🚦 SIGNALS */}
       {signals.map((s, i) => {
         const traffic = getTrafficLevel(vehicles, s.lat, s.lng);
 
