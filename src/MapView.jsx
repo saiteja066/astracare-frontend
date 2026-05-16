@@ -10,7 +10,7 @@ import { useEffect, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-/* 🔥 FIX DEFAULT ICON */
+/* FIX ICON */
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl:
@@ -19,98 +19,85 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
 
-/* 🚑 AMBULANCE */
+/* 🚑 REAL AMBULANCE ICON */
 const ambulanceIcon = new L.Icon({
-  iconUrl: "https://cdn-icons-png.flaticon.com/512/809/809957.png",
-  iconSize: [40, 40],
-  iconAnchor: [20, 40],
+  iconUrl: "https://cdn-icons-png.flaticon.com/512/2967/2967350.png",
+  iconSize: [42, 42],
+  iconAnchor: [21, 42],
 });
 
 /* 🚗 CAR */
 const carIcon = new L.Icon({
-  iconUrl: "https://cdn-icons-png.flaticon.com/512/1048/1048313.png",
+  iconUrl: "https://cdn-icons-png.flaticon.com/512/744/744465.png",
   iconSize: [28, 28],
   iconAnchor: [14, 28],
 });
 
-/* 🚦 SIGNAL */
+/* 🚦 TRAFFIC SIGNAL (3 LIGHT STYLE) */
 const signalIcon = new L.Icon({
-  iconUrl: "https://cdn-icons-png.flaticon.com/512/3063/3063822.png",
-  iconSize: [30, 30],
-  iconAnchor: [15, 30],
+  iconUrl: "https://cdn-icons-png.flaticon.com/512/2972/2972185.png",
+  iconSize: [32, 32],
+  iconAnchor: [16, 32],
 });
 
-/* 🎯 AUTO FOLLOW AMBULANCE */
-function MapAutoFocus({ position }) {
+/* 🎯 AUTO FOLLOW */
+function Follow({ pos }) {
   const map = useMap();
-
   useEffect(() => {
-    if (position) {
-      map.flyTo(position, 15); // zoom + focus
-    }
-  }, [position]);
-
+    if (pos) map.flyTo(pos, 15);
+  }, [pos]);
   return null;
 }
 
 export default function MapView() {
-  const [vehicles, setVehicles] = useState([]);
-  const [signals, setSignals] = useState([]);
   const [route, setRoute] = useState([]);
   const [ambulancePos, setAmbulancePos] = useState(null);
-  const [center, setCenter] = useState([17.24, 78.24]);
+  const [vehicles, setVehicles] = useState([]);
+  const [signals, setSignals] = useState([]);
 
+  /* LOAD DATA + ROUTE */
   useEffect(() => {
     const data = JSON.parse(localStorage.getItem("trackingData"));
     if (!data) return;
 
     const { user, ambulance } = data;
 
-    setCenter([user.lat, user.lng]);
-    setAmbulancePos([ambulance.lat, ambulance.lng]);
-
-    /* 🚗 SPREAD VEHICLES (NO CROWDING) */
-    const v = [
-      { id: 1, lat: user.lat + 0.004, lng: user.lng + 0.004 },
-      { id: 2, lat: user.lat - 0.004, lng: user.lng + 0.003 },
-      { id: 3, lat: user.lat + 0.003, lng: user.lng - 0.004 },
-      { id: 4, lat: user.lat - 0.005, lng: user.lng - 0.003 },
-    ];
-    setVehicles(v);
-
-    /* 🚦 SPREAD SIGNALS */
-    const s = [
-      { id: 1, lat: user.lat + 0.006, lng: user.lng + 0.002 },
-      { id: 2, lat: user.lat - 0.006, lng: user.lng - 0.002 },
-      { id: 3, lat: user.lat + 0.002, lng: user.lng - 0.006 },
-    ];
-    setSignals(s);
-
-    /* 🛣️ ROUTE */
     const fetchRoute = async () => {
-      try {
-        const url = `https://router.project-osrm.org/route/v1/driving/${ambulance.lng},${ambulance.lat};${user.lng},${user.lat}?overview=full&geometries=geojson`;
+      const url = `https://router.project-osrm.org/route/v1/driving/${ambulance.lng},${ambulance.lat};${user.lng},${user.lat}?overview=full&geometries=geojson`;
 
-        const res = await fetch(url);
-        const result = await res.json();
+      const res = await fetch(url);
+      const json = await res.json();
 
-        if (result?.routes?.length > 0) {
-          const coords = result.routes[0].geometry.coordinates.map((c) => [
-            c[1],
-            c[0],
-          ]);
+      if (json.routes?.length) {
+        const coords = json.routes[0].geometry.coordinates.map((c) => [
+          c[1],
+          c[0],
+        ]);
 
-          setRoute(coords);
-        }
-      } catch (err) {
-        console.log(err);
+        setRoute(coords);
+
+        /* 🚦 SIGNALS ON ROUTE */
+        setSignals([
+          coords[Math.floor(coords.length * 0.3)],
+          coords[Math.floor(coords.length * 0.6)],
+          coords[Math.floor(coords.length * 0.8)],
+        ]);
+
+        /* 🚗 VEHICLES ON ROUTE */
+        setVehicles([
+          { id: 1, index: 10 },
+          { id: 2, index: 25 },
+          { id: 3, index: 40 },
+        ]);
+
+        setAmbulancePos(coords[0]);
       }
     };
 
     fetchRoute();
   }, []);
 
-  /* 🚑 MOVEMENT */
+  /* 🚑 AMBULANCE MOVE */
   useEffect(() => {
     if (!route.length) return;
 
@@ -123,31 +110,32 @@ export default function MapView() {
       } else {
         clearInterval(interval);
       }
-    }, 250);
+    }, 150);
+
+    return () => clearInterval(interval);
+  }, [route]);
+
+  /* 🚗 VEHICLE MOVE */
+  useEffect(() => {
+    if (!route.length) return;
+
+    const interval = setInterval(() => {
+      setVehicles((prev) =>
+        prev.map((v) => ({
+          ...v,
+          index: (v.index + 1) % route.length,
+        })),
+      );
+    }, 200);
 
     return () => clearInterval(interval);
   }, [route]);
 
   return (
-    <MapContainer center={center} zoom={14} style={{ height: "500px" }}>
+    <MapContainer center={[17.24, 78.24]} zoom={14} style={{ height: "500px" }}>
       <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
-      {/* 🎯 AUTO ZOOM */}
-      <MapAutoFocus position={ambulancePos} />
-
-      {/* 🚗 VEHICLES */}
-      {vehicles.map((v) => (
-        <Marker key={v.id} position={[v.lat, v.lng]} icon={carIcon}>
-          <Popup>🚗 Vehicle</Popup>
-        </Marker>
-      ))}
-
-      {/* 🚦 SIGNALS */}
-      {signals.map((s) => (
-        <Marker key={s.id} position={[s.lat, s.lng]} icon={signalIcon}>
-          <Popup>🚦 Signal</Popup>
-        </Marker>
-      ))}
+      <Follow pos={ambulancePos} />
 
       {/* 🛣️ ROUTE */}
       {route.length > 0 && (
@@ -163,6 +151,20 @@ export default function MapView() {
           <Popup>🚑 Ambulance</Popup>
         </Marker>
       )}
+
+      {/* 🚗 VEHICLES ON ROUTE */}
+      {vehicles.map((v) => (
+        <Marker key={v.id} position={route[v.index]} icon={carIcon}>
+          <Popup>🚗 Vehicle</Popup>
+        </Marker>
+      ))}
+
+      {/* 🚦 SIGNALS */}
+      {signals.map((s, i) => (
+        <Marker key={i} position={s} icon={signalIcon}>
+          <Popup>🚦 Signal</Popup>
+        </Marker>
+      ))}
     </MapContainer>
   );
 }
