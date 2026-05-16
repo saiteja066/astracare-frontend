@@ -6,7 +6,7 @@ import {
   Polyline,
   useMap,
 } from "react-leaflet";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -19,175 +19,202 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
 
-/* 🚑 AMBULANCE ICON */
+/* ICONS */
 const ambulanceIcon = new L.Icon({
   iconUrl: "https://cdn-icons-png.flaticon.com/512/2967/2967350.png",
-  iconSize: [40, 40],
-  iconAnchor: [20, 40],
+  iconSize: [42, 42],
+  iconAnchor: [21, 42],
 });
-
-/* 🚗 CAR ICON */
 const carIcon = new L.Icon({
   iconUrl: "https://cdn-icons-png.flaticon.com/512/744/744465.png",
   iconSize: [28, 28],
   iconAnchor: [14, 28],
 });
-
-/* 🚦 SIGNAL ICON */
 const signalIcon = new L.Icon({
   iconUrl: "https://cdn-icons-png.flaticon.com/512/2972/2972185.png",
-  iconSize: [30, 30],
-  iconAnchor: [15, 30],
+  iconSize: [32, 32],
+  iconAnchor: [16, 32],
 });
 
-/* 🎯 AUTO FOLLOW */
+/* FOLLOW */
 function Follow({ pos }) {
   const map = useMap();
-
   useEffect(() => {
-    if (pos && Array.isArray(pos)) {
-      map.flyTo(pos, 15);
-    }
+    if (pos) map.flyTo(pos, 15, { duration: 0.5 });
   }, [pos]);
-
   return null;
 }
 
+/* ---- Helpers for smooth path ---- */
+function lerp(a, b, t) {
+  return a + (b - a) * t;
+}
+
+function dist(a, b) {
+  const dx = a[0] - b[0];
+  const dy = a[1] - b[1];
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+/* Resample route into evenly spaced points */
+function resample(coords, step = 0.0002) {
+  if (!coords || coords.length < 2) return coords || [];
+  const out = [coords[0]];
+  let prev = coords[0];
+
+  for (let i = 1; i < coords.length; i++) {
+    const curr = coords[i];
+    let d = dist(prev, curr);
+
+    while (d > step) {
+      const t = step / d;
+      const nx = lerp(prev[0], curr[0], t);
+      const ny = lerp(prev[1], curr[1], t);
+      const next = [nx, ny];
+      out.push(next);
+      prev = next;
+      d = dist(prev, curr);
+    }
+    out.push(curr);
+    prev = curr;
+  }
+  return out;
+}
+
 export default function MapView() {
-  const [route, setRoute] = useState([]);
+  const [rawRoute, setRawRoute] = useState([]);
+  const [route, setRoute] = useState([]); // resampled (smooth)
   const [ambulancePos, setAmbulancePos] = useState(null);
-  const [vehicles, setVehicles] = useState([]);
   const [signals, setSignals] = useState([]);
   const [center, setCenter] = useState([17.24, 78.24]);
 
-  /* 📦 LOAD + ROUTE */
+  // moving indices
+  const ambIndex = useRef(0);
+  const vehicleStates = useRef([
+    { id: 1, index: 20, speed: 1.0 },
+    { id: 2, index: 80, speed: 0.7 },
+    { id: 3, index: 140, speed: 0.9 },
+  ]);
+
+  /* Load + fetch route */
   useEffect(() => {
-    try {
-      const data = JSON.parse(localStorage.getItem("trackingData"));
-      if (!data?.user || !data?.ambulance) return;
+    const data = JSON.parse(localStorage.getItem("trackingData"));
+    if (!data?.user || !data?.ambulance) return;
 
-      const { user, ambulance } = data;
+    const { user, ambulance } = data;
+    setCenter([user.lat, user.lng]);
 
-      setCenter([user.lat, user.lng]);
-      setAmbulancePos([ambulance.lat, ambulance.lng]);
+    const fetchRoute = async () => {
+      try {
+        const url = `https://router.project-osrm.org/route/v1/driving/${ambulance.lng},${ambulance.lat};${user.lng},${user.lat}?overview=full&geometries=geojson`;
+        const res = await fetch(url);
+        const json = await res.json();
 
-      const fetchRoute = async () => {
-        try {
-          const url = `https://router.project-osrm.org/route/v1/driving/${ambulance.lng},${ambulance.lat};${user.lng},${user.lat}?overview=full&geometries=geojson`;
+        if (json?.routes?.length) {
+          const coords = json.routes[0].geometry.coordinates.map((c) => [
+            c[1],
+            c[0],
+          ]);
 
-          const res = await fetch(url);
-          const json = await res.json();
+          setRawRoute(coords);
 
-          if (json?.routes?.length > 0) {
-            const coords = json.routes[0].geometry.coordinates.map((c) => [
-              c[1],
-              c[0],
-            ]);
+          // create smooth route
+          const smooth = resample(coords, 0.00015);
+          setRoute(smooth);
 
-            setRoute(coords);
+          // place signals along route
+          setSignals([
+            smooth[Math.floor(smooth.length * 0.25)],
+            smooth[Math.floor(smooth.length * 0.5)],
+            smooth[Math.floor(smooth.length * 0.75)],
+          ]);
 
-            /* 🚦 SIGNALS */
-            setSignals([
-              coords[Math.floor(coords.length * 0.3)],
-              coords[Math.floor(coords.length * 0.6)],
-              coords[Math.floor(coords.length * 0.8)],
-            ]);
-
-            /* 🚗 VEHICLES */
-            setVehicles([
-              { id: 1, index: 10 },
-              { id: 2, index: 30 },
-              { id: 3, index: 50 },
-            ]);
-          }
-        } catch (err) {
-          console.log("Route error:", err);
+          ambIndex.current = 0;
+          setAmbulancePos(smooth[0]);
         }
-      };
+      } catch (e) {
+        console.log(e);
+      }
+    };
 
-      fetchRoute();
-    } catch (err) {
-      console.log("Storage error:", err);
-    }
+    fetchRoute();
   }, []);
 
-  /* 🚑 AMBULANCE MOVE */
+  /* Smooth animation loop (shared clock) */
   useEffect(() => {
-    if (!Array.isArray(route) || route.length === 0) return;
+    if (!route.length) return;
 
-    let i = 0;
+    let rafId;
+    const tick = () => {
+      // ambulance
+      ambIndex.current = (ambIndex.current + 1) % route.length;
+      setAmbulancePos(route[ambIndex.current]);
 
-    const interval = setInterval(() => {
-      if (route[i]) {
-        setAmbulancePos(route[i]);
-        i++;
-      } else {
-        clearInterval(interval);
-      }
-    }, 200);
+      // vehicles (different speeds, same path, looped)
+      vehicleStates.current = vehicleStates.current.map((v) => ({
+        ...v,
+        index: (v.index + v.speed) % route.length,
+      }));
 
-    return () => clearInterval(interval);
+      rafId = requestAnimationFrame(tick);
+    };
+
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
   }, [route]);
 
-  /* 🚗 VEHICLE MOVE */
-  useEffect(() => {
-    if (!Array.isArray(route) || route.length === 0) return;
-
-    const interval = setInterval(() => {
-      setVehicles((prev) =>
-        prev.map((v) => ({
-          ...v,
-          index: (v.index + 1) % route.length,
-        })),
-      );
-    }, 250);
-
-    return () => clearInterval(interval);
-  }, [route]);
+  // memo positions to avoid extra renders
+  const vehiclePositions = useMemo(() => {
+    if (!route.length) return [];
+    return vehicleStates.current.map((v) => {
+      const i = Math.floor(v.index) % route.length;
+      return { id: v.id, pos: route[i] };
+    });
+  }, [route, ambulancePos]); // recalc as animation advances
 
   return (
     <MapContainer center={center} zoom={14} style={{ height: "500px" }}>
       <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
-      {/* 🎯 FOLLOW */}
       <Follow pos={ambulancePos} />
 
-      {/* 🛣️ ROUTE */}
-      {Array.isArray(route) && route.length > 0 && (
+      {/* show original route faint + smooth route bold */}
+      {rawRoute.length > 0 && (
+        <Polyline
+          positions={rawRoute}
+          pathOptions={{ color: "#9ca3af", weight: 2 }}
+        />
+      )}
+      {route.length > 0 && (
         <Polyline
           positions={route}
           pathOptions={{ color: "green", weight: 5 }}
         />
       )}
 
-      {/* 🚑 AMBULANCE */}
+      {/* Ambulance */}
       {ambulancePos && (
         <Marker position={ambulancePos} icon={ambulanceIcon}>
           <Popup>🚑 Ambulance</Popup>
         </Marker>
       )}
 
-      {/* 🚗 VEHICLES (SAFE) */}
-      {vehicles.map((v) => {
-        if (!route[v.index]) return null;
+      {/* Vehicles (no disappearing, looped) */}
+      {vehiclePositions.map((v) => (
+        <Marker key={v.id} position={v.pos} icon={carIcon}>
+          <Popup>🚗 Vehicle</Popup>
+        </Marker>
+      ))}
 
-        return (
-          <Marker key={v.id} position={route[v.index]} icon={carIcon}>
-            <Popup>🚗 Vehicle</Popup>
-          </Marker>
-        );
-      })}
-
-      {/* 🚦 SIGNALS (SAFE) */}
-      {signals.map((s, i) => {
-        if (!s) return null;
-
-        return (
-          <Marker key={i} position={s} icon={signalIcon}>
-            <Popup>🚦 Signal</Popup>
-          </Marker>
-        );
-      })}
+      {/* Signals on route */}
+      {signals.map(
+        (s, i) =>
+          s && (
+            <Marker key={i} position={s} icon={signalIcon}>
+              <Popup>🚦 Signal</Popup>
+            </Marker>
+          ),
+      )}
     </MapContainer>
   );
 }
