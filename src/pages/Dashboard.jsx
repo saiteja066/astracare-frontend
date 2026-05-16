@@ -1,18 +1,14 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-export default function Dashboard({ vehicles, signals }) {
+export default function Dashboard({ vehicles = [], signals = [] }) {
   const [vCount, setVCount] = useState(0);
   const [sCount, setSCount] = useState(0);
 
   const navigate = useNavigate();
 
-  // 🚪 LOGOUT FUNCTION
   const handleLogout = () => {
-    // remove token
     localStorage.removeItem("token");
-
-    // redirect + refresh auth state
     window.location.href = "/login";
   };
 
@@ -20,14 +16,17 @@ export default function Dashboard({ vehicles, signals }) {
     let v = 0;
     let s = 0;
 
+    const vLen = Array.isArray(vehicles) ? vehicles.length : 0;
+    const sLen = Array.isArray(signals) ? signals.length : 0;
+
     const interval = setInterval(() => {
-      if (v < vehicles.length) v++;
-      if (s < signals.length) s++;
+      if (v < vLen) v++;
+      if (s < sLen) s++;
 
       setVCount(v);
       setSCount(s);
 
-      if (v === vehicles.length && s === signals.length) {
+      if (v === vLen && s === sLen) {
         clearInterval(interval);
       }
     }, 200);
@@ -39,7 +38,6 @@ export default function Dashboard({ vehicles, signals }) {
     <div>
       <div className="title">🚦 Smart Traffic Dashboard</div>
 
-      {/* 🔥 FIXED LOGOUT BUTTON */}
       <div
         className="logout"
         onClick={handleLogout}

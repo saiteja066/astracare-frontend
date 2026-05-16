@@ -7,9 +7,10 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-export default function Analytics({ vehicles = [] }) {
-  // ✅ safe fallback
-  const count = vehicles.length || 0;
+export default function Analytics({ vehicles }) {
+  // ✅ SAFE CHECK
+  const safeVehicles = Array.isArray(vehicles) ? vehicles : [];
+  const count = safeVehicles.length;
 
   const data = [
     { time: "T1", traffic: 3 },
@@ -22,7 +23,6 @@ export default function Analytics({ vehicles = [] }) {
     <div className="card">
       <h2>📊 Traffic Analytics</h2>
 
-      {/* IMPORTANT: height must be fixed */}
       <div style={{ width: "100%", height: "300px" }}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data}>

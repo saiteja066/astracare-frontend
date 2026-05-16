@@ -18,10 +18,16 @@ import Register from "./pages/Register";
 import Sidebar from "./Sidebar";
 
 function App() {
-  /* 🚑 GLOBAL TARGET (AMBULANCE) */
+  /* 🚑 GLOBAL TARGET */
   const [target, setTarget] = useState({
     ambulance: { lat: 17.21, lng: 78.21 },
   });
+
+  /* 🚗 GLOBAL VEHICLES (fallback/demo) */
+  const [vehicles] = useState([
+    { lat: 17.22, lng: 78.22, speed: 20 },
+    { lat: 17.24, lng: 78.23, speed: 15 },
+  ]);
 
   /* 🚦 SIGNALS */
   const signals = [
@@ -46,7 +52,6 @@ function App() {
   return (
     <Router>
       <div style={{ display: "flex", height: "100vh" }}>
-        {/* Sidebar only when logged in */}
         {localStorage.getItem("token") && <Sidebar />}
 
         <div style={{ flex: 1, padding: "20px" }}>
@@ -76,7 +81,7 @@ function App() {
               path="/"
               element={
                 <ProtectedRoute>
-                  <Dashboard signals={signals} />
+                  <Dashboard vehicles={vehicles} signals={signals} />
                 </ProtectedRoute>
               }
             />
@@ -96,7 +101,7 @@ function App() {
               path="/analytics"
               element={
                 <ProtectedRoute>
-                  <Analytics />
+                  <Analytics vehicles={vehicles} />
                 </ProtectedRoute>
               }
             />

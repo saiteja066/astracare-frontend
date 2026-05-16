@@ -25,7 +25,7 @@ const hospitalIcon = new L.Icon({
   iconSize: [35, 35],
 });
 
-/* 🗺️ Auto follow ambulance */
+/* 🗺️ Auto follow */
 function MapUpdater({ position }) {
   const map = useMap();
 
@@ -45,12 +45,17 @@ export default function Tracking() {
   const [eta, setEta] = useState("");
   const [arrived, setArrived] = useState(false);
 
-  /* 📦 Load stored data */
+  /* 📦 Load data */
   useEffect(() => {
-    const stored = JSON.parse(localStorage.getItem("trackingData"));
-    if (stored) {
-      setData(stored);
-      setAmbulancePos([stored.ambulance.lat, stored.ambulance.lng]);
+    try {
+      const stored = JSON.parse(localStorage.getItem("trackingData"));
+
+      if (stored && stored.ambulance && stored.user) {
+        setData(stored);
+        setAmbulancePos([stored.ambulance.lat, stored.ambulance.lng]);
+      }
+    } catch (err) {
+      console.log("Storage error:", err);
     }
   }, []);
 
@@ -66,28 +71,28 @@ export default function Tracking() {
 
         const result = await res.json();
 
-        if (result.routes?.length) {
+        if (result?.routes?.length > 0) {
           const coords = result.routes[0].geometry.coordinates.map((c) => [
             c[1],
             c[0],
           ]);
 
-          setRoute(coords);
+          setRoute(coords || []);
 
           const time = result.routes[0].duration / 60;
           setEta(time.toFixed(1) + " mins");
         }
       } catch (err) {
-        console.log("Route error", err);
+        console.log("Route error:", err);
       }
     };
 
     fetchRoute();
   }, [data]);
 
-  /* 🚑 Ambulance animation */
+  /* 🚑 Animate */
   useEffect(() => {
-    if (!route.length) return;
+    if (!Array.isArray(route) || route.length === 0) return;
 
     let i = 0;
 
@@ -97,10 +102,8 @@ export default function Tracking() {
         i++;
       } else {
         clearInterval(interval);
-
-        // ✅ ARRIVED
         setArrived(true);
-        setRoute([]); // remove route
+        setRoute([]);
       }
     }, 300);
 
@@ -113,7 +116,6 @@ export default function Tracking() {
     <div>
       <h2 className="title">🚑 Ambulance Tracking</h2>
 
-      {/* ✅ ARRIVAL MESSAGE */}
       {arrived && (
         <div
           className="card"
@@ -128,7 +130,6 @@ export default function Tracking() {
         </div>
       )}
 
-      {/* ⏱️ ETA */}
       <div className="card" style={{ marginBottom: "15px" }}>
         {arrived ? (
           <b>✅ Arrived</b>
@@ -139,10 +140,7 @@ export default function Tracking() {
         )}
       </div>
 
-      {/* 🗺️ MAP */}
-      <div
-        style={{ height: "500px", borderRadius: "16px", overflow: "hidden" }}
-      >
+      <div style={{ height: "500px", borderRadius: "16px" }}>
         <MapContainer
           center={[data.user.lat, data.user.lng]}
           zoom={14}
@@ -152,22 +150,18 @@ export default function Tracking() {
 
           <MapUpdater position={ambulancePos} />
 
-          {/* 📍 USER */}
           <Marker position={[data.user.lat, data.user.lng]} icon={userIcon} />
 
-          {/* 🏥 HOSPITAL */}
           <Marker
             position={[data.hospital.lat, data.hospital.lng]}
             icon={hospitalIcon}
           />
 
-          {/* 🚑 AMBULANCE */}
           {ambulancePos && (
             <Marker position={ambulancePos} icon={ambulanceIcon} />
           )}
 
-          {/* 🛣️ ROUTE */}
-          {route.length > 0 && (
+          {Array.isArray(route) && route.length > 0 && (
             <Polyline
               positions={route}
               pathOptions={{ color: "#22c55e", weight: 5 }}
