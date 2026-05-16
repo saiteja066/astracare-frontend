@@ -4,6 +4,7 @@ import {
   Marker,
   Popup,
   Polyline,
+  useMap,
 } from "react-leaflet";
 import { useEffect, useState } from "react";
 import L from "leaflet";
@@ -18,26 +19,39 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
 
-/* 🚑 AMBULANCE ICON */
+/* 🚑 AMBULANCE */
 const ambulanceIcon = new L.Icon({
   iconUrl: "https://cdn-icons-png.flaticon.com/512/809/809957.png",
   iconSize: [40, 40],
   iconAnchor: [20, 40],
 });
 
-/* 🚗 CAR ICON */
+/* 🚗 CAR */
 const carIcon = new L.Icon({
   iconUrl: "https://cdn-icons-png.flaticon.com/512/1048/1048313.png",
   iconSize: [28, 28],
   iconAnchor: [14, 28],
 });
 
-/* 🚦 SIGNAL ICON */
+/* 🚦 SIGNAL */
 const signalIcon = new L.Icon({
   iconUrl: "https://cdn-icons-png.flaticon.com/512/3063/3063822.png",
   iconSize: [30, 30],
   iconAnchor: [15, 30],
 });
+
+/* 🎯 AUTO FOLLOW AMBULANCE */
+function MapAutoFocus({ position }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (position) {
+      map.flyTo(position, 15); // zoom + focus
+    }
+  }, [position]);
+
+  return null;
+}
 
 export default function MapView() {
   const [vehicles, setVehicles] = useState([]);
@@ -55,22 +69,24 @@ export default function MapView() {
     setCenter([user.lat, user.lng]);
     setAmbulancePos([ambulance.lat, ambulance.lng]);
 
-    /* 🚗 VEHICLES NEAR USER */
+    /* 🚗 SPREAD VEHICLES (NO CROWDING) */
     const v = [
-      { id: 1, lat: user.lat + 0.002, lng: user.lng + 0.002 },
-      { id: 2, lat: user.lat - 0.002, lng: user.lng + 0.001 },
-      { id: 3, lat: user.lat + 0.001, lng: user.lng - 0.002 },
+      { id: 1, lat: user.lat + 0.004, lng: user.lng + 0.004 },
+      { id: 2, lat: user.lat - 0.004, lng: user.lng + 0.003 },
+      { id: 3, lat: user.lat + 0.003, lng: user.lng - 0.004 },
+      { id: 4, lat: user.lat - 0.005, lng: user.lng - 0.003 },
     ];
     setVehicles(v);
 
-    /* 🚦 SIGNALS NEAR USER */
+    /* 🚦 SPREAD SIGNALS */
     const s = [
-      { id: 1, lat: user.lat + 0.003, lng: user.lng + 0.001 },
-      { id: 2, lat: user.lat - 0.003, lng: user.lng - 0.002 },
+      { id: 1, lat: user.lat + 0.006, lng: user.lng + 0.002 },
+      { id: 2, lat: user.lat - 0.006, lng: user.lng - 0.002 },
+      { id: 3, lat: user.lat + 0.002, lng: user.lng - 0.006 },
     ];
     setSignals(s);
 
-    /* 🛣️ FETCH ROUTE */
+    /* 🛣️ ROUTE */
     const fetchRoute = async () => {
       try {
         const url = `https://router.project-osrm.org/route/v1/driving/${ambulance.lng},${ambulance.lat};${user.lng},${user.lat}?overview=full&geometries=geojson`;
@@ -87,14 +103,14 @@ export default function MapView() {
           setRoute(coords);
         }
       } catch (err) {
-        console.log("Route error:", err);
+        console.log(err);
       }
     };
 
     fetchRoute();
   }, []);
 
-  /* 🚑 AMBULANCE MOVEMENT */
+  /* 🚑 MOVEMENT */
   useEffect(() => {
     if (!route.length) return;
 
@@ -107,7 +123,7 @@ export default function MapView() {
       } else {
         clearInterval(interval);
       }
-    }, 200); // speed
+    }, 250);
 
     return () => clearInterval(interval);
   }, [route]);
@@ -116,10 +132,13 @@ export default function MapView() {
     <MapContainer center={center} zoom={14} style={{ height: "500px" }}>
       <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
+      {/* 🎯 AUTO ZOOM */}
+      <MapAutoFocus position={ambulancePos} />
+
       {/* 🚗 VEHICLES */}
       {vehicles.map((v) => (
         <Marker key={v.id} position={[v.lat, v.lng]} icon={carIcon}>
-          <Popup>🚗 Car</Popup>
+          <Popup>🚗 Vehicle</Popup>
         </Marker>
       ))}
 
@@ -138,10 +157,10 @@ export default function MapView() {
         />
       )}
 
-      {/* 🚑 MOVING AMBULANCE */}
+      {/* 🚑 AMBULANCE */}
       {ambulancePos && (
         <Marker position={ambulancePos} icon={ambulanceIcon}>
-          <Popup>🚑 Moving Ambulance</Popup>
+          <Popup>🚑 Ambulance</Popup>
         </Marker>
       )}
     </MapContainer>
