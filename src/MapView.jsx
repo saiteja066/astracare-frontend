@@ -9,7 +9,7 @@ import { useEffect, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-/* 🔥 FIX ICON */
+/* 🔥 FIX DEFAULT ICON */
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl:
@@ -18,46 +18,62 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
 
-/* 🚗 CAR ICON */
-const carIcon = new L.Icon({
-  iconUrl: "https://cdn-icons-png.flaticon.com/512/743/743922.png",
-  iconSize: [25, 25],
-});
-
 /* 🚑 AMBULANCE ICON */
 const ambulanceIcon = new L.Icon({
-  iconUrl: "https://cdn-icons-png.flaticon.com/512/2967/2967350.png",
-  iconSize: [35, 35],
+  iconUrl: "https://cdn-icons-png.flaticon.com/512/809/809957.png",
+  iconSize: [40, 40],
+  iconAnchor: [20, 40],
+});
+
+/* 🚗 CAR ICON */
+const carIcon = new L.Icon({
+  iconUrl: "https://cdn-icons-png.flaticon.com/512/1048/1048313.png",
+  iconSize: [28, 28],
+  iconAnchor: [14, 28],
 });
 
 /* 🚦 SIGNAL ICON */
 const signalIcon = new L.Icon({
-  iconUrl: "https://cdn-icons-png.flaticon.com/512/463/463626.png",
-  iconSize: [25, 25],
+  iconUrl: "https://cdn-icons-png.flaticon.com/512/3063/3063822.png",
+  iconSize: [30, 30],
+  iconAnchor: [15, 30],
 });
 
-export default function MapView({ signals = [] }) {
+export default function MapView() {
+  const [vehicles, setVehicles] = useState([]);
+  const [signals, setSignals] = useState([]);
   const [route, setRoute] = useState([]);
   const [ambulancePos, setAmbulancePos] = useState(null);
+  const [center, setCenter] = useState([17.24, 78.24]);
 
-  /* 🔥 STATIC VEHICLES (OLD STYLE) */
-  const vehicles = [
-    { id: 1, lat: 17.22, lng: 78.22 },
-    { id: 2, lat: 17.25, lng: 78.25 },
-    { id: 3, lat: 17.26, lng: 78.24 },
-  ];
-
-  /* 📦 LOAD TRACKING DATA */
   useEffect(() => {
     const data = JSON.parse(localStorage.getItem("trackingData"));
     if (!data) return;
 
-    setAmbulancePos([data.ambulance.lat, data.ambulance.lng]);
+    const { user, ambulance } = data;
+
+    setCenter([user.lat, user.lng]);
+    setAmbulancePos([ambulance.lat, ambulance.lng]);
+
+    /* 🚗 VEHICLES NEAR USER */
+    const v = [
+      { id: 1, lat: user.lat + 0.002, lng: user.lng + 0.002 },
+      { id: 2, lat: user.lat - 0.002, lng: user.lng + 0.001 },
+      { id: 3, lat: user.lat + 0.001, lng: user.lng - 0.002 },
+    ];
+    setVehicles(v);
+
+    /* 🚦 SIGNALS NEAR USER */
+    const s = [
+      { id: 1, lat: user.lat + 0.003, lng: user.lng + 0.001 },
+      { id: 2, lat: user.lat - 0.003, lng: user.lng - 0.002 },
+    ];
+    setSignals(s);
 
     /* 🛣️ FETCH ROUTE */
     const fetchRoute = async () => {
       try {
-        const url = `https://router.project-osrm.org/route/v1/driving/${data.ambulance.lng},${data.ambulance.lat};${data.user.lng},${data.user.lat}?overview=full&geometries=geojson`;
+        const url = `https://router.project-osrm.org/route/v1/driving/${ambulance.lng},${ambulance.lat};${user.lng},${user.lat}?overview=full&geometries=geojson`;
 
         const res = await fetch(url);
         const result = await res.json();
@@ -67,6 +83,7 @@ export default function MapView({ signals = [] }) {
             c[1],
             c[0],
           ]);
+
           setRoute(coords);
         }
       } catch (err) {
@@ -77,11 +94,29 @@ export default function MapView({ signals = [] }) {
     fetchRoute();
   }, []);
 
+  /* 🚑 AMBULANCE MOVEMENT */
+  useEffect(() => {
+    if (!route.length) return;
+
+    let i = 0;
+
+    const interval = setInterval(() => {
+      if (i < route.length) {
+        setAmbulancePos(route[i]);
+        i++;
+      } else {
+        clearInterval(interval);
+      }
+    }, 200); // speed
+
+    return () => clearInterval(interval);
+  }, [route]);
+
   return (
-    <MapContainer center={[17.24, 78.24]} zoom={13} style={{ height: "500px" }}>
+    <MapContainer center={center} zoom={14} style={{ height: "500px" }}>
       <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
-      {/* 🚗 CARS */}
+      {/* 🚗 VEHICLES */}
       {vehicles.map((v) => (
         <Marker key={v.id} position={[v.lat, v.lng]} icon={carIcon}>
           <Popup>🚗 Car</Popup>
@@ -96,12 +131,17 @@ export default function MapView({ signals = [] }) {
       ))}
 
       {/* 🛣️ ROUTE */}
-      {route.length > 0 && <Polyline positions={route} color="green" />}
+      {route.length > 0 && (
+        <Polyline
+          positions={route}
+          pathOptions={{ color: "green", weight: 5 }}
+        />
+      )}
 
-      {/* 🚑 AMBULANCE */}
+      {/* 🚑 MOVING AMBULANCE */}
       {ambulancePos && (
         <Marker position={ambulancePos} icon={ambulanceIcon}>
-          <Popup>🚑 Ambulance</Popup>
+          <Popup>🚑 Moving Ambulance</Popup>
         </Marker>
       )}
     </MapContainer>
