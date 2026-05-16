@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import { useNavigate } from "react-router-dom";
 
 export default function Hospitals() {
   const [hospitals, setHospitals] = useState([]);
@@ -9,8 +8,7 @@ export default function Hospitals() {
   const [place, setPlace] = useState("");
   const [error, setError] = useState("");
   const [loaded, setLoaded] = useState(false);
-
-  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
 
   /* 📏 DISTANCE */
   function getDistance(lat1, lon1, lat2, lon2) {
@@ -27,13 +25,14 @@ export default function Hospitals() {
     return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
 
-  /* 🚀 FETCH FROM BACKEND (FIXED) */
+  /* 🚀 FETCH */
   const fetchHospitals = async (lat, lng) => {
     setError("");
+    setLoading(true);
 
     try {
       const res = await fetch(
-        "https://astracare-backend.onrender.com/api/hospitals/search", // ✅ FIXED URL
+        "https://astracare-backend.onrender.com/api/hospitals/search",
         {
           method: "POST",
           headers: {
@@ -52,7 +51,7 @@ export default function Hospitals() {
       const sorted = (data.hospitals || [])
         .map((h) => ({
           ...h,
-          distance: getDistance(lat, lng, h.lat, h.lng), // ✅ FIXED lng
+          distance: getDistance(lat, lng, h.lat, h.lng),
         }))
         .sort((a, b) => a.distance - b.distance);
 
@@ -62,6 +61,8 @@ export default function Hospitals() {
       console.log(err);
       setError("❌ Failed to load hospitals");
     }
+
+    setLoading(false);
   };
 
   /* 📍 AUTO LOCATION */
@@ -77,7 +78,7 @@ export default function Hospitals() {
     );
   }, [loaded]);
 
-  /* 🔍 SEARCH LOCATION */
+  /* 🔍 SEARCH */
   const handleSearch = async () => {
     if (!place) return;
 
@@ -108,21 +109,6 @@ export default function Hospitals() {
     return null;
   }
 
-  /* 🚑 ROUTE */
-  const handleRoute = (h) => {
-    const data = {
-      user: coords,
-      hospital: { lat: h.lat, lng: h.lng }, // ✅ FIXED
-      ambulance: {
-        lat: coords.lat,
-        lng: coords.lng,
-      },
-    };
-
-    localStorage.setItem("trackingData", JSON.stringify(data));
-    navigate("/tracking");
-  };
-
   return (
     <div>
       <h2 className="title">🏥 Hospitals Near You</h2>
@@ -138,8 +124,14 @@ export default function Hospitals() {
         <button onClick={handleSearch}>🔍</button>
       </div>
 
+      {/* 🔄 LOADING */}
+      {loading && <p>🔄 Loading hospitals...</p>}
+
       {/* ❌ ERROR */}
-      {error && <div>{error}</div>}
+      {error && <p>{error}</p>}
+
+      {/* ❌ NO DATA */}
+      {!loading && hospitals.length === 0 && <p>❌ No hospitals found</p>}
 
       {/* 🗺️ MAP */}
       {coords && (
@@ -165,16 +157,34 @@ export default function Hospitals() {
         </div>
       )}
 
-      {/* 🏥 LIST */}
-      {hospitals.map((h, i) => (
-        <div key={i} style={{ marginBottom: "10px" }}>
-          <b>🏥 {h.name}</b>
-          <br />
-          📍 {h.distance.toFixed(2)} km away
-          <br />
-          <button onClick={() => handleRoute(h)}>🚑 Book Ambulance</button>
-        </div>
-      ))}
+      {/* 🏥 CARDS (ZOMATO STYLE) */}
+      {hospitals.map((h, i) => {
+        const rating = (4 + Math.random()).toFixed(1);
+
+        return (
+          <div
+            key={i}
+            style={{
+              background: "#1e293b",
+              color: "white",
+              padding: "15px",
+              borderRadius: "12px",
+              marginBottom: "15px",
+              boxShadow: "0 5px 15px rgba(0,0,0,0.2)",
+            }}
+          >
+            <h3>🏥 {h.name}</h3>
+
+            <p style={{ color: "#94a3b8" }}>Multi-speciality Hospital</p>
+
+            <p>⭐ {rating} | 100+ reviews</p>
+
+            <p style={{ color: "#22c55e" }}>
+              📍 {h.distance.toFixed(2)} km away
+            </p>
+          </div>
+        );
+      })}
     </div>
   );
 }
