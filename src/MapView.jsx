@@ -1,138 +1,110 @@
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Popup,
+  Polyline,
+  useMap,
+} from "react-leaflet";
 import { useEffect, useState } from "react";
-import { io } from "socket.io-client";
-import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import "leaflet.heat";
+import L from "leaflet";
 
-/* 🔥 FIX LEAFLET ICON BUG */
+// 🔥 Fix marker icons
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl:
-    "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+    "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png",
+  iconUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png",
 });
 
-/* 🔌 SOCKET */
-const socket = io("https://astracare-backend.onrender.com", {
-  transports: ["websocket"],
-});
-
-/* 🚦 SIGNAL ICONS */
-const redSignal = new L.Icon({
-  iconUrl: "https://cdn-icons-png.flaticon.com/512/463/463612.png",
-  iconSize: [25, 25],
-});
-
-const orangeSignal = new L.Icon({
-  iconUrl: "https://cdn-icons-png.flaticon.com/512/463/463621.png",
-  iconSize: [25, 25],
-});
-
-const greenSignal = new L.Icon({
-  iconUrl: "https://cdn-icons-png.flaticon.com/512/463/463626.png",
-  iconSize: [25, 25],
-});
-
+// 🚑 Icons
 const ambulanceIcon = new L.Icon({
   iconUrl: "https://cdn-icons-png.flaticon.com/512/2967/2967350.png",
   iconSize: [35, 35],
 });
 
-/* 🚦 TRAFFIC LOGIC */
-function getTrafficLevel(vehicles, lat, lng) {
-  const nearby = vehicles.filter(
-    (v) => Math.abs(v.lat - lat) < 0.01 && Math.abs(v.lng - lng) < 0.01,
-  );
+const hospitalIcon = new L.Icon({
+  iconUrl: "https://cdn-icons-png.flaticon.com/512/1484/1484842.png",
+  iconSize: [35, 35],
+});
 
-  if (!nearby.length) return "green";
+const userIcon = new L.Icon({
+  iconUrl: "https://cdn-icons-png.flaticon.com/512/64/64113.png",
+  iconSize: [30, 30],
+});
 
-  const avgSpeed = nearby.reduce((sum, v) => sum + v.speed, 0) / nearby.length;
+const signalIcon = new L.Icon({
+  iconUrl: "https://cdn-icons-png.flaticon.com/512/854/854878.png",
+  iconSize: [25, 25],
+});
 
-  const score = nearby.length / (avgSpeed || 1);
-
-  if (score > 8) return "red";
-  if (score > 4) return "orange";
-  return "green";
-}
-
-function getSignalIcon(status) {
-  if (status === "red") return redSignal;
-  if (status === "orange") return orangeSignal;
-  return greenSignal;
-}
-
-/* 🔥 HEATMAP */
-function Heatmap({ vehicles }) {
+// 🔥 Smooth map movement (ONLY on target change)
+function MapUpdater({ target }) {
   const map = useMap();
 
   useEffect(() => {
-    if (!vehicles.length) return;
-
-    const heatData = vehicles.map((v) => [
-      v.lat,
-      v.lng,
-      v.speed < 15 ? 1 : 0.3,
-    ]);
-
-    const heatLayer = L.heatLayer(heatData, {
-      radius: 25,
-      blur: 15,
-    });
-
-    heatLayer.addTo(map);
-
-    return () => map.removeLayer(heatLayer);
-  }, [vehicles, map]);
+    if (target?.user) {
+      map.flyTo([target.user.lat, target.user.lng], 14, {
+        duration: 1.5,
+      });
+    }
+  }, [target]);
 
   return null;
 }
 
-export default function MapView({ signals = [], target = {} }) {
-  const [vehicles, setVehicles] = useState([]);
+export default function MapView({ signals = [], target }) {
+  const [route, setRoute] = useState([]);
 
-  /* 🚗 SOCKET */
+  const center = target?.user
+    ? [target.user.lat, target.user.lng]
+    : [17.385, 78.4867];
+
+  // 🚀 FETCH REAL ROUTE
   useEffect(() => {
-    socket.on("vehicleUpdate", (data) => {
-      console.log("Socket data:", data);
-      setVehicles(data);
-    });
+    if (target?.user && target?.hospital) {
+      const fetchRoute = async () => {
+        try {
+          const res = await fetch(
+            `https://router.project-osrm.org/route/v1/driving/${target.user.lng},${target.user.lat};${target.hospital.lng},${target.hospital.lat}?overview=full&geometries=geojson`,
+          );
 
-    return () => socket.off("vehicleUpdate");
-  }, []);
+          const data = await res.json();
+
+          if (data.routes?.length) {
+            const coords = data.routes[0].geometry.coordinates.map((c) => [
+              c[1],
+              c[0],
+            ]);
+            setRoute(coords);
+          }
+        } catch (err) {
+          console.log("Route fetch error");
+        }
+      };
+
+      fetchRoute();
+    }
+  }, [target]);
 
   return (
     <MapContainer
-      center={[17.24, 78.24]} // ✅ FIXED CENTER (IMPORTANT)
-      zoom={12}
-      style={{ height: "500px", width: "100%" }}
+      center={center}
+      zoom={13}
+      style={{ height: "100%", width: "100%" }}
     >
       <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
-      <Heatmap vehicles={vehicles} />
+      <MapUpdater target={target} />
 
-      {/* 🚗 VEHICLES */}
-      {vehicles.map((v, i) => (
-        <Marker key={i} position={[v.lat, v.lng]}>
-          <Popup>🚗 Speed: {v.speed?.toFixed(1)} km/h</Popup>
+      {/* 📍 USER */}
+      {target?.user && (
+        <Marker position={[target.user.lat, target.user.lng]} icon={userIcon}>
+          <Popup>📍 You</Popup>
         </Marker>
-      ))}
-
-      {/* 🚦 SIGNALS */}
-      {signals.map((s, i) => {
-        const traffic = getTrafficLevel(vehicles, s.lat, s.lng);
-
-        return (
-          <Marker
-            key={i}
-            position={[s.lat, s.lng]}
-            icon={getSignalIcon(traffic)}
-          >
-            <Popup>🚦 Traffic: {traffic}</Popup>
-          </Marker>
-        );
-      })}
+      )}
 
       {/* 🚑 AMBULANCE */}
       {target?.ambulance && (
@@ -142,6 +114,34 @@ export default function MapView({ signals = [], target = {} }) {
         >
           <Popup>🚑 Ambulance</Popup>
         </Marker>
+      )}
+
+      {/* 🏥 HOSPITAL */}
+      {target?.hospital && (
+        <Marker
+          position={[target.hospital.lat, target.hospital.lng]}
+          icon={hospitalIcon}
+        >
+          <Popup>🏥 Hospital</Popup>
+        </Marker>
+      )}
+
+      {/* 🚦 SIGNALS */}
+      {signals.map((s, i) => (
+        <Marker key={i} position={[s.lat, s.lng]} icon={signalIcon}>
+          <Popup>
+            🚦 Signal <br />
+            Status: {s.status}
+          </Popup>
+        </Marker>
+      ))}
+
+      {/* 🛣️ REAL ROUTE */}
+      {route.length > 0 && (
+        <Polyline
+          positions={route}
+          pathOptions={{ color: "#3b82f6", weight: 5 }}
+        />
       )}
     </MapContainer>
   );
