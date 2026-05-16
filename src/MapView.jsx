@@ -21,7 +21,7 @@ const hospitalIcon = new L.Icon({
   iconSize: [36, 36],
 });
 
-/* FOLLOW */
+/* FOLLOW MAP */
 function Follow({ pos }) {
   const map = useMap();
   useEffect(() => {
@@ -29,18 +29,6 @@ function Follow({ pos }) {
   }, [pos]);
   return null;
 }
-
-/* DISTANCE */
-function getDistance(lat1, lon1, lat2, lon2) {
-  const dx = lat1 - lat2;
-  const dy = lon1 - lon2;
-  return Math.sqrt(dx * dx + dy * dy);
-}
-
-/* LOCAL HOSPITALS */
-const localHospitals = [
-  { name: "Vani Hospital", lat: 16.52, lng: 80.62, city: "Local Area" },
-];
 
 export default function MapView() {
   const [route, setRoute] = useState([]);
@@ -54,7 +42,7 @@ export default function MapView() {
 
   const ambIndex = useRef(0);
 
-  /* 📍 GET USER LOCATION */
+  /* 📍 USER LOCATION */
   useEffect(() => {
     navigator.geolocation.getCurrentPosition((pos) => {
       setUserLocation({
@@ -64,7 +52,7 @@ export default function MapView() {
     });
   }, []);
 
-  /* 🔎 SEARCH */
+  /* 🔎 HYBRID SEARCH */
   useEffect(() => {
     if (query.length < 2 || !userLocation) {
       setResults([]);
@@ -73,90 +61,74 @@ export default function MapView() {
 
     const fetchHospitals = async () => {
       try {
-        // 🔥 LOCAL FIRST
-        const local = localHospitals.filter((h) =>
+        /* 🔥 STEP 1: OVERPASS (NEARBY) */
+        const localRes = await fetch(
+          `http://localhost:5000/api/hospitals/nearby?lat=${userLocation.lat}&lng=${userLocation.lng}`,
+        );
+
+        let localData = await localRes.json();
+
+        const filteredLocal = localData.filter((h) =>
           h.name.toLowerCase().includes(query.toLowerCase()),
         );
 
-        // 🔥 API (NEARBY)
+        if (filteredLocal.length > 0) {
+          setResults(filteredLocal);
+          return;
+        }
+
+        /* 🔥 STEP 2: FALLBACK */
         const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${query}+hospital&limit=10`,
+          `https://nominatim.openstreetmap.org/search?format=json&q=${query}+hospital&limit=5`,
         );
 
         let data = await res.json();
 
-        data = data
-          .filter((d) => d.display_name.toLowerCase().includes("hospital"))
-          .map((d) => ({
-            name: d.display_name.split(",")[0],
-            lat: parseFloat(d.lat),
-            lng: parseFloat(d.lon),
-            city: d.display_name.split(",").slice(-3)[0],
-          }));
+        const fallback = data.map((d) => ({
+          name: d.display_name.split(",")[0],
+          lat: parseFloat(d.lat),
+          lng: parseFloat(d.lon),
+        }));
 
-        // 🔥 SORT BY DISTANCE
-        data.sort((a, b) => {
-          const d1 = getDistance(
-            userLocation.lat,
-            userLocation.lng,
-            a.lat,
-            a.lng,
-          );
-          const d2 = getDistance(
-            userLocation.lat,
-            userLocation.lng,
-            b.lat,
-            b.lng,
-          );
-          return d1 - d2;
-        });
-
-        setResults([...local, ...data]);
+        setResults(fallback);
       } catch (err) {
         console.log(err);
       }
     };
 
-    const delay = setTimeout(fetchHospitals, 300);
+    const delay = setTimeout(fetchHospitals, 400);
     return () => clearTimeout(delay);
   }, [query, userLocation]);
 
-  /* 🚀 ROUTE FIXED */
+  /* 🚀 ROUTE (FIXED) */
   useEffect(() => {
     const data = JSON.parse(localStorage.getItem("trackingData"));
     if (!data || !manualHospital) return;
 
-    const { user } = data; // ✅ IMPORTANT FIX
+    const { user } = data;
 
     const fetchRoute = async () => {
-      try {
-        const res = await fetch(
-          `https://router.project-osrm.org/route/v1/driving/${user.lng},${user.lat};${manualHospital.lng},${manualHospital.lat}?overview=full&geometries=geojson`,
-        );
+      const res = await fetch(
+        `https://router.project-osrm.org/route/v1/driving/${user.lng},${user.lat};${manualHospital.lng},${manualHospital.lat}?overview=full&geometries=geojson`,
+      );
 
-        const json = await res.json();
-        if (!json.routes?.length) return;
+      const json = await res.json();
+      if (!json.routes?.length) return;
 
-        const coords = json.routes[0].geometry.coordinates.map((c) => [
-          c[1],
-          c[0],
-        ]);
+      const coords = json.routes[0].geometry.coordinates.map((c) => [
+        c[1],
+        c[0],
+      ]);
 
-        setRoute(coords);
-
-        // ✅ START FROM USER
-        setAmbulancePos([user.lat, user.lng]);
-
-        ambIndex.current = 0;
-      } catch (err) {
-        console.log(err);
-      }
+      setRoute(coords);
+      setAmbulancePos([user.lat, user.lng]);
+      ambIndex.current = 0;
     };
 
     fetchRoute();
   }, [manualHospital]);
 
-  /* 🚑 SMOOTH MOVEMENT */
+  /* 🚑 MOVE */
   useEffect(() => {
     if (!route.length) return;
 
@@ -176,66 +148,54 @@ export default function MapView() {
   return (
     <div style={{ padding: "10px" }}>
       {/* 🔎 SEARCH */}
-      <div style={{ position: "relative", maxWidth: "450px" }}>
+      <div style={{ position: "relative", maxWidth: "400px" }}>
         <input
           placeholder="Search hospitals..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           style={{
             width: "100%",
-            padding: "12px",
-            borderRadius: "12px",
+            padding: "10px",
+            borderRadius: "10px",
             border: "1px solid #ccc",
           }}
         />
 
-        {/* RESULTS */}
         {results.length > 0 && (
           <div
             style={{
               position: "absolute",
               width: "100%",
               background: "white",
-              borderRadius: "12px",
+              border: "1px solid #ccc",
+              borderRadius: "10px",
               marginTop: "5px",
-              boxShadow: "0 4px 10px rgba(0,0,0,0.1)",
               zIndex: 1000,
-              maxHeight: "200px",
-              overflowY: "auto",
             }}
           >
             {results.map((r, i) => (
               <div
                 key={i}
                 onClick={() => {
-                  setRoute([]); // 🔥 reset
-                  ambIndex.current = 0;
-
-                  setManualHospital({
-                    lat: r.lat,
-                    lng: r.lng,
-                  });
-
+                  setManualHospital(r);
                   setQuery(r.name);
                   setResults([]);
+                  setRoute([]);
+                  ambIndex.current = 0;
                 }}
                 style={{
                   padding: "10px",
                   cursor: "pointer",
-                  borderBottom: "1px solid #eee",
                 }}
               >
-                🏥 <b>{r.name}</b>
-                <div style={{ fontSize: "12px", color: "#666" }}>
-                  📍 {r.city}
-                </div>
+                🏥 {r.name}
               </div>
             ))}
           </div>
         )}
       </div>
 
-      {/* MAP */}
+      {/* 🗺️ MAP */}
       <MapContainer
         center={[17.24, 78.24]}
         zoom={13}
@@ -245,22 +205,19 @@ export default function MapView() {
 
         <Follow pos={ambulancePos} />
 
-        {/* ROUTE */}
         {route.length > 0 && (
           <Polyline positions={route} pathOptions={{ color: "green" }} />
         )}
 
-        {/* HOSPITAL */}
         {manualHospital && (
           <Marker
             position={[manualHospital.lat, manualHospital.lng]}
             icon={hospitalIcon}
           >
-            <Popup>🏥 Hospital</Popup>
+            <Popup>🏥 {manualHospital.name}</Popup>
           </Marker>
         )}
 
-        {/* AMBULANCE */}
         {ambulancePos && (
           <Marker position={ambulancePos} icon={ambulanceIcon}>
             <Popup>🚑 Ambulance</Popup>
