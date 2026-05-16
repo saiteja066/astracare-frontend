@@ -1,14 +1,23 @@
 import { useEffect, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
+import L from "leaflet";
 import { useNavigate } from "react-router-dom";
+
+/* 🔥 FIX LEAFLET MARKER ISSUE */
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl:
+    "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png",
+  iconUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png",
+});
 
 export default function Hospitals() {
   const [hospitals, setHospitals] = useState([]);
   const [coords, setCoords] = useState(null);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
 
   const navigate = useNavigate();
 
@@ -27,10 +36,9 @@ export default function Hospitals() {
     return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
 
-  /* 🚀 FETCH HOSPITALS */
-  const fetchHospitals = async (lat, lng, searchQuery = "") => {
+  /* 🚀 FETCH */
+  const fetchHospitals = async (lat, lng, search = "") => {
     setLoading(true);
-    setError("");
 
     try {
       const res = await fetch(
@@ -41,14 +49,14 @@ export default function Hospitals() {
           body: JSON.stringify({
             lat,
             lng,
-            query: searchQuery,
+            query: search,
           }),
         },
       );
 
       const data = await res.json();
 
-      console.log("API RESPONSE 👉", data);
+      console.log("API 👉", data);
 
       const sorted = (data.hospitals || [])
         .map((h) => ({
@@ -61,20 +69,19 @@ export default function Hospitals() {
       setCoords({ lat, lng });
     } catch (err) {
       console.log("Fetch error:", err);
-      setError("❌ Failed to load hospitals");
     }
 
     setLoading(false);
   };
 
-  /* 📍 GET LOCATION */
+  /* 📍 LOCATION */
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         fetchHospitals(pos.coords.latitude, pos.coords.longitude);
       },
       () => {
-        // 🔥 fallback (Hyderabad)
+        // fallback
         fetchHospitals(17.385, 78.486);
       },
     );
@@ -86,7 +93,7 @@ export default function Hospitals() {
     fetchHospitals(coords.lat, coords.lng, query);
   };
 
-  /* 🗺️ MAP UPDATE */
+  /* 🗺️ MAP CENTER */
   function MapUpdater({ coords }) {
     const map = useMap();
 
@@ -99,7 +106,7 @@ export default function Hospitals() {
     return null;
   }
 
-  /* 🚑 BOOK AMBULANCE */
+  /* 🚑 BOOK */
   const handleRoute = (h) => {
     const data = {
       user: coords,
@@ -110,6 +117,11 @@ export default function Hospitals() {
     localStorage.setItem("trackingData", JSON.stringify(data));
     navigate("/map");
   };
+
+  /* UI STATES */
+  if (loading) return <h2>Loading hospitals...</h2>;
+
+  if (hospitals.length === 0) return <h2>No hospitals found ❌</h2>;
 
   return (
     <div>
@@ -126,15 +138,6 @@ export default function Hospitals() {
         <button onClick={handleSearch}>Search</button>
       </div>
 
-      {/* 🔄 LOADING */}
-      {loading && <p>🔄 Loading hospitals...</p>}
-
-      {/* ❌ ERROR */}
-      {error && <p>{error}</p>}
-
-      {/* ❌ NO DATA */}
-      {!loading && hospitals.length === 0 && <p>No hospitals found ❌</p>}
-
       {/* 🗺️ MAP */}
       {coords && (
         <div style={{ height: "300px", marginBottom: "20px" }}>
@@ -144,15 +147,12 @@ export default function Hospitals() {
             style={{ height: "100%" }}
           >
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+
             <MapUpdater coords={coords} />
 
             {hospitals.map((h, i) => (
               <Marker key={i} position={[h.lat, h.lng]}>
-                <Popup>
-                  <b>{h.name}</b>
-                  <br />
-                  📍 {h.distance.toFixed(2)} km
-                </Popup>
+                <Popup>{h.name}</Popup>
               </Marker>
             ))}
           </MapContainer>
