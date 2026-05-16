@@ -5,38 +5,85 @@ export default function Emergency() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
+  /* 📏 DISTANCE */
+  function getDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) ** 2;
+
+    return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  /* 🚑 EMERGENCY */
   const handleEmergency = () => {
     setLoading(true);
 
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
+      async (pos) => {
         const user = {
           lat: pos.coords.latitude,
           lng: pos.coords.longitude,
         };
 
-        // 🔥 fake nearby hospital
-        const hospital = {
-          lat: user.lat + 0.02,
-          lng: user.lng + 0.02,
-        };
+        try {
+          // 🔥 fetch hospitals from backend
+          const res = await fetch(
+            "https://astracare-backend.onrender.com/hospitals",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(user),
+            },
+          );
 
-        const ambulance = {
-          lat: user.lat + 0.01,
-          lng: user.lng + 0.01,
-        };
+          const data = await res.json();
 
-        const data = {
-          user,
-          hospital,
-          ambulance,
-        };
+          if (!data.elements?.length) {
+            alert("No hospitals found");
+            setLoading(false);
+            return;
+          }
 
-        // ✅ store data
-        localStorage.setItem("trackingData", JSON.stringify(data));
+          // 🔥 find nearest hospital
+          const nearest = data.elements
+            .map((h) => ({
+              ...h,
+              distance: getDistance(user.lat, user.lng, h.lat, h.lon),
+            }))
+            .sort((a, b) => a.distance - b.distance)[0];
 
-        // ✅ go to tracking page
-        navigate("/tracking");
+          const hospital = {
+            lat: nearest.lat,
+            lng: nearest.lon,
+          };
+
+          const ambulance = {
+            lat: user.lat + 0.01,
+            lng: user.lng + 0.01,
+          };
+
+          const trackingData = {
+            user,
+            hospital,
+            ambulance,
+          };
+
+          // ✅ store
+          localStorage.setItem("trackingData", JSON.stringify(trackingData));
+
+          // ✅ navigate
+          navigate("/tracking");
+        } catch (err) {
+          console.log(err);
+          alert("Emergency request failed");
+          setLoading(false);
+        }
       },
       () => {
         alert("Location access denied");
