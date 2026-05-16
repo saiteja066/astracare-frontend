@@ -18,7 +18,7 @@ export default function Dashboard({ vehicles = [], signals = [] }) {
       if (v === vehicles.length && s === signals.length) {
         clearInterval(interval);
       }
-    }, 200);
+    }, 150);
 
     return () => clearInterval(interval);
   }, [vehicles, signals]);
@@ -30,12 +30,12 @@ export default function Dashboard({ vehicles = [], signals = [] }) {
       <div className="grid">
         <div className="card">
           <h3>Vehicles</h3>
-          <h1>{vCount}</h1>
+          <h1>{vehicles.length === 0 ? "—" : vCount}</h1>
         </div>
 
         <div className="card">
           <h3>Signals</h3>
-          <h1>{sCount}</h1>
+          <h1>{signals.length === 0 ? "—" : sCount}</h1>
         </div>
 
         <div className="card">
