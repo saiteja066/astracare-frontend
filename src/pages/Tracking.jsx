@@ -1,44 +1,180 @@
 import { useEffect, useState } from "react";
-import { MapContainer, TileLayer, Marker } from "react-leaflet";
-import L from "leaflet";
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Polyline,
+  useMap,
+} from "react-leaflet";
 import "leaflet/dist/leaflet.css";
+import L from "leaflet";
 
-/* ICON */
+/* 🚑 Icons */
 const ambulanceIcon = new L.Icon({
   iconUrl: "https://cdn-icons-png.flaticon.com/512/2967/2967350.png",
   iconSize: [40, 40],
 });
 
-export default function Tracking() {
-  const [ambulance, setAmbulance] = useState(null);
+const userIcon = new L.Icon({
+  iconUrl: "https://cdn-icons-png.flaticon.com/512/64/64113.png",
+  iconSize: [30, 30],
+});
+
+const hospitalIcon = new L.Icon({
+  iconUrl: "https://cdn-icons-png.flaticon.com/512/1484/1484842.png",
+  iconSize: [35, 35],
+});
+
+/* 🗺️ Auto follow ambulance */
+function MapUpdater({ position }) {
+  const map = useMap();
 
   useEffect(() => {
-    try {
-      const data = JSON.parse(localStorage.getItem("trackingData"));
-      if (data?.ambulance) {
-        setAmbulance(data.ambulance);
-      }
-    } catch {}
+    if (position) {
+      map.flyTo(position, 15);
+    }
+  }, [position]);
+
+  return null;
+}
+
+export default function Tracking() {
+  const [data, setData] = useState(null);
+  const [ambulancePos, setAmbulancePos] = useState(null);
+  const [route, setRoute] = useState([]);
+  const [eta, setEta] = useState("");
+  const [arrived, setArrived] = useState(false);
+
+  /* 📦 Load stored data */
+  useEffect(() => {
+    const stored = JSON.parse(localStorage.getItem("trackingData"));
+    if (stored) {
+      setData(stored);
+      setAmbulancePos([stored.ambulance.lat, stored.ambulance.lng]);
+    }
   }, []);
 
-  if (!ambulance) return <h2>Loading...</h2>;
+  /* 🛣️ Fetch route */
+  useEffect(() => {
+    if (!data) return;
+
+    const fetchRoute = async () => {
+      try {
+        const res = await fetch(
+          `https://router.project-osrm.org/route/v1/driving/${data.ambulance.lng},${data.ambulance.lat};${data.user.lng},${data.user.lat}?overview=full&geometries=geojson`,
+        );
+
+        const result = await res.json();
+
+        if (result.routes?.length) {
+          const coords = result.routes[0].geometry.coordinates.map((c) => [
+            c[1],
+            c[0],
+          ]);
+
+          setRoute(coords);
+
+          const time = result.routes[0].duration / 60;
+          setEta(time.toFixed(1) + " mins");
+        }
+      } catch (err) {
+        console.log("Route error", err);
+      }
+    };
+
+    fetchRoute();
+  }, [data]);
+
+  /* 🚑 Ambulance animation */
+  useEffect(() => {
+    if (!route.length) return;
+
+    let i = 0;
+
+    const interval = setInterval(() => {
+      if (i < route.length) {
+        setAmbulancePos(route[i]);
+        i++;
+      } else {
+        clearInterval(interval);
+
+        // ✅ ARRIVED
+        setArrived(true);
+        setRoute([]); // remove route
+      }
+    }, 300);
+
+    return () => clearInterval(interval);
+  }, [route]);
+
+  if (!data) return <h2>Loading...</h2>;
 
   return (
     <div>
-      <h2>🚑 Tracking</h2>
+      <h2 className="title">🚑 Ambulance Tracking</h2>
 
-      <MapContainer
-        center={[ambulance.lat, ambulance.lng]}
-        zoom={13}
-        style={{ height: "500px" }}
+      {/* ✅ ARRIVAL MESSAGE */}
+      {arrived && (
+        <div
+          className="card"
+          style={{
+            background: "#16a34a",
+            color: "white",
+            textAlign: "center",
+            marginBottom: "10px",
+          }}
+        >
+          🚑 Ambulance has arrived!
+        </div>
+      )}
+
+      {/* ⏱️ ETA */}
+      <div className="card" style={{ marginBottom: "15px" }}>
+        {arrived ? (
+          <b>✅ Arrived</b>
+        ) : (
+          <>
+            ⏱️ ETA: <b>{eta}</b>
+          </>
+        )}
+      </div>
+
+      {/* 🗺️ MAP */}
+      <div
+        style={{ height: "500px", borderRadius: "16px", overflow: "hidden" }}
       >
-        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+        <MapContainer
+          center={[data.user.lat, data.user.lng]}
+          zoom={14}
+          style={{ height: "100%" }}
+        >
+          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
-        <Marker
-          position={[ambulance.lat, ambulance.lng]}
-          icon={ambulanceIcon}
-        />
-      </MapContainer>
+          <MapUpdater position={ambulancePos} />
+
+          {/* 📍 USER */}
+          <Marker position={[data.user.lat, data.user.lng]} icon={userIcon} />
+
+          {/* 🏥 HOSPITAL */}
+          <Marker
+            position={[data.hospital.lat, data.hospital.lng]}
+            icon={hospitalIcon}
+          />
+
+          {/* 🚑 AMBULANCE */}
+          {ambulancePos && (
+            <Marker position={ambulancePos} icon={ambulanceIcon} />
+          )}
+
+          {/* 🛣️ ROUTE */}
+          {route.length > 0 && (
+            <Polyline
+              positions={route}
+              pathOptions={{ color: "#22c55e", weight: 5 }}
+            />
+          )}
+        </MapContainer>
+      </div>
     </div>
   );
 }

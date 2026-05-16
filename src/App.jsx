@@ -18,18 +18,12 @@ import Register from "./pages/Register";
 import Sidebar from "./Sidebar";
 
 function App() {
-  /* 🚑 GLOBAL TARGET */
+  // ✅ DEFAULT TARGET (IMPORTANT FIX)
   const [target, setTarget] = useState({
     ambulance: { lat: 17.21, lng: 78.21 },
   });
 
-  /* 🚗 GLOBAL VEHICLES (fallback/demo) */
-  const [vehicles] = useState([
-    { lat: 17.22, lng: 78.22, speed: 20 },
-    { lat: 17.24, lng: 78.23, speed: 15 },
-  ]);
-
-  /* 🚦 SIGNALS */
+  // ✅ SIGNALS OK
   const signals = [
     { id: 1, lat: 17.22, lng: 78.22 },
     { id: 2, lat: 17.26, lng: 78.27 },
@@ -81,7 +75,7 @@ function App() {
               path="/"
               element={
                 <ProtectedRoute>
-                  <Dashboard vehicles={vehicles} signals={signals} />
+                  <Dashboard signals={signals} />
                 </ProtectedRoute>
               }
             />
@@ -101,7 +95,7 @@ function App() {
               path="/analytics"
               element={
                 <ProtectedRoute>
-                  <Analytics vehicles={vehicles} />
+                  <Analytics />
                 </ProtectedRoute>
               }
             />
