@@ -10,7 +10,6 @@ import { useEffect, useState, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-/* ICONS */
 const ambulanceIcon = new L.Icon({
   iconUrl: "https://cdn-icons-png.flaticon.com/512/2967/2967350.png",
   iconSize: [40, 40],
@@ -21,7 +20,6 @@ const hospitalIcon = new L.Icon({
   iconSize: [35, 35],
 });
 
-/* FOLLOW */
 function Follow({ pos }) {
   const map = useMap();
   useEffect(() => {
@@ -40,16 +38,11 @@ export default function MapView() {
 
   const ambIndex = useRef(0);
 
-  /* 📍 DEFAULT LOCATION */
   const userLat = 17.385;
   const userLng = 78.486;
 
-  /* 🔎 SEARCH */
   useEffect(() => {
-    if (query.length < 2) {
-      setResults([]);
-      return;
-    }
+    if (query.length < 2) return;
 
     const fetchSearch = async () => {
       try {
@@ -79,7 +72,6 @@ export default function MapView() {
     return () => clearTimeout(delay);
   }, [query]);
 
-  /* 🚀 ROUTE */
   const createRoute = async (hospital) => {
     const res = await fetch(
       `https://router.project-osrm.org/route/v1/driving/${userLng},${userLat};${hospital.lng},${hospital.lat}?overview=full&geometries=geojson`,
@@ -94,16 +86,11 @@ export default function MapView() {
     ambIndex.current = 0;
   };
 
-  /* 🚑 MOVE */
   useEffect(() => {
     if (!route.length) return;
 
     const interval = setInterval(() => {
-      if (ambIndex.current >= route.length - 1) {
-        clearInterval(interval);
-        return;
-      }
-
+      if (ambIndex.current >= route.length - 1) return;
       ambIndex.current++;
       setAmbulancePos(route[ambIndex.current]);
     }, 150);
@@ -120,14 +107,7 @@ export default function MapView() {
       />
 
       {results.map((r, i) => (
-        <div
-          key={i}
-          onClick={() => {
-            setSelectedHospital(r);
-            createRoute(r);
-            setResults([]);
-          }}
-        >
+        <div key={i} onClick={() => createRoute(r)}>
           🏥 {r.name}
         </div>
       ))}
@@ -138,24 +118,12 @@ export default function MapView() {
         style={{ height: "500px" }}
       >
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-
         <Follow pos={ambulancePos} />
 
         {route.length > 0 && <Polyline positions={route} />}
 
-        {selectedHospital && (
-          <Marker
-            position={[selectedHospital.lat, selectedHospital.lng]}
-            icon={hospitalIcon}
-          >
-            <Popup>{selectedHospital.name}</Popup>
-          </Marker>
-        )}
-
         {ambulancePos && (
-          <Marker position={ambulancePos} icon={ambulanceIcon}>
-            <Popup>🚑 Ambulance</Popup>
-          </Marker>
+          <Marker position={ambulancePos} icon={ambulanceIcon} />
         )}
       </MapContainer>
     </div>
