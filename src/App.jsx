@@ -1,18 +1,20 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Sidebar from "./components/Sidebar";
+import Sidebar from "./components/Sidebar.jsx";
 
-import Dashboard from "./pages/Dashboard";
-import Emergency from "./pages/Emergency";
-import MapView from "./pages/MapView";
-import Hospitals from "./pages/Hospitals";
+import Dashboard from "./pages/Dashboard.jsx";
+import Emergency from "./pages/Emergency.jsx";
+import MapView from "./pages/MapView.jsx";
+import Hospitals from "./pages/Hospitals.jsx";
 
 export default function App() {
   return (
     <BrowserRouter>
-      <div style={{ display: "flex" }}>
+      <div style={styles.layout}>
+        {/* Sidebar */}
         <Sidebar />
 
-        <div style={{ flex: 1, background: "#020617", minHeight: "100vh" }}>
+        {/* Main Content */}
+        <div style={styles.content}>
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/emergency" element={<Emergency />} />
@@ -24,3 +26,14 @@ export default function App() {
     </BrowserRouter>
   );
 }
+
+const styles = {
+  layout: {
+    display: "flex",
+  },
+  content: {
+    flex: 1,
+    background: "#020617",
+    minHeight: "100vh",
+  },
+};
