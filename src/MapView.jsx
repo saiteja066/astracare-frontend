@@ -29,11 +29,6 @@ const ambulanceIcon = new L.Icon({
   iconUrl: "https://cdn-icons-png.flaticon.com/512/2967/2967350.png",
   iconSize: [35, 35],
 });
-
-console.log("vehicles:", vehicles);
-console.log("signals:", signals);
-console.log("target:", target);
-
 /* 🚦 TRAFFIC LOGIC */
 function getTrafficLevel(vehicles, lat, lng) {
   const nearby = vehicles.filter(
