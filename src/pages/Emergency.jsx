@@ -18,7 +18,7 @@ export default function Emergency() {
         try {
           /* 🔥 CALL BACKEND */
           const res = await fetch(
-            "http://localhost:5000/api/hospitals/emergency",
+            "https://astracare-backend.onrender.com/api/hospitals/emergency",
             {
               method: "POST",
               headers: {

@@ -52,17 +52,20 @@ export default function MapView() {
 
     const fetchSearch = async () => {
       try {
-        const res = await fetch("http://localhost:5000/api/hospitals/search", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
+        const res = await fetch(
+          "https://astracare-backend.onrender.com/api/hospitals/search",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              lat: data.user.lat,
+              lng: data.user.lng,
+              query,
+            }),
           },
-          body: JSON.stringify({
-            lat: data.user.lat,
-            lng: data.user.lng,
-            query,
-          }),
-        });
+        );
 
         const result = await res.json();
         setResults(result.hospitals || []);
