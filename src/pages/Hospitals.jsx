@@ -27,37 +27,39 @@ export default function Hospitals() {
     return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
 
-  /* 🚀 FETCH */
+  /* 🚀 FETCH FROM BACKEND (FIXED) */
   const fetchHospitals = async (lat, lng) => {
     setError("");
 
     try {
       const res = await fetch(
-        "https://astracare-backend.onrender.com/hospitals",
+        "https://astracare-backend.onrender.com/api/hospitals/search", // ✅ FIXED URL
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ lat, lng }),
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            lat,
+            lng,
+            query: "",
+          }),
         },
       );
 
-      if (res.status === 503) {
-        setError("⚠️ Server busy, try again");
-        return;
-      }
-
       const data = await res.json();
 
-      const sorted = data.elements
+      const sorted = (data.hospitals || [])
         .map((h) => ({
           ...h,
-          distance: getDistance(lat, lng, h.lat, h.lon),
+          distance: getDistance(lat, lng, h.lat, h.lng), // ✅ FIXED lng
         }))
         .sort((a, b) => a.distance - b.distance);
 
       setHospitals(sorted);
       setCoords({ lat, lng });
-    } catch {
+    } catch (err) {
+      console.log(err);
       setError("❌ Failed to load hospitals");
     }
   };
@@ -75,7 +77,7 @@ export default function Hospitals() {
     );
   }, [loaded]);
 
-  /* 🔍 SEARCH */
+  /* 🔍 SEARCH LOCATION */
   const handleSearch = async () => {
     if (!place) return;
 
@@ -93,7 +95,7 @@ export default function Hospitals() {
     fetchHospitals(parseFloat(data[0].lat), parseFloat(data[0].lon));
   };
 
-  /* 🗺️ MAP MOVE */
+  /* 🗺️ MAP UPDATE */
   function MapUpdater({ coords }) {
     const map = useMap();
 
@@ -110,10 +112,10 @@ export default function Hospitals() {
   const handleRoute = (h) => {
     const data = {
       user: coords,
-      hospital: { lat: h.lat, lng: h.lon },
+      hospital: { lat: h.lat, lng: h.lng }, // ✅ FIXED
       ambulance: {
-        lat: coords.lat + 0.01,
-        lng: coords.lng + 0.01,
+        lat: coords.lat,
+        lng: coords.lng,
       },
     };
 
@@ -126,37 +128,22 @@ export default function Hospitals() {
       <h2 className="title">🏥 Hospitals Near You</h2>
 
       {/* 🔍 SEARCH */}
-      <div
-        className="card"
-        style={{ display: "flex", gap: "10px", marginBottom: "20px" }}
-      >
+      <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
         <input
           value={place}
           onChange={(e) => setPlace(e.target.value)}
           placeholder="Search city..."
-          style={{
-            flex: 1,
-            padding: "12px",
-            borderRadius: "10px",
-            border: "none",
-          }}
+          style={{ flex: 1, padding: "10px" }}
         />
         <button onClick={handleSearch}>🔍</button>
       </div>
 
       {/* ❌ ERROR */}
-      {error && <div className="card">{error}</div>}
+      {error && <div>{error}</div>}
 
       {/* 🗺️ MAP */}
       {coords && (
-        <div
-          style={{
-            height: "250px",
-            marginBottom: "25px",
-            borderRadius: "16px",
-            overflow: "hidden",
-          }}
-        >
+        <div style={{ height: "250px", marginBottom: "20px" }}>
           <MapContainer
             center={[coords.lat, coords.lng]}
             zoom={13}
@@ -166,9 +153,9 @@ export default function Hospitals() {
             <MapUpdater coords={coords} />
 
             {hospitals.map((h, i) => (
-              <Marker key={i} position={[h.lat, h.lon]}>
+              <Marker key={i} position={[h.lat, h.lng]}>
                 <Popup>
-                  <b>{h.tags?.name || "Hospital"}</b>
+                  <b>{h.name}</b>
                   <br />
                   📏 {h.distance.toFixed(2)} km
                 </Popup>
@@ -178,70 +165,16 @@ export default function Hospitals() {
         </div>
       )}
 
-      {/* 🏥 PREMIUM UI */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-          gap: "20px",
-        }}
-      >
-        {hospitals.map((h, i) => {
-          const rating = (4 + Math.random()).toFixed(1);
-
-          const name = h.tags?.name || "Hospital";
-
-          const type = name.toLowerCase().includes("care")
-            ? "Cardiology"
-            : name.toLowerCase().includes("child")
-              ? "Pediatrics"
-              : name.toLowerCase().includes("women")
-                ? "Gynecology"
-                : "Multi-speciality";
-
-          return (
-            <div
-              key={i}
-              style={{
-                background: "linear-gradient(135deg, #1e293b, #0f172a)",
-                borderRadius: "16px",
-                padding: "18px",
-                color: "white",
-                boxShadow: "0 10px 25px rgba(0,0,0,0.3)",
-                transition: "0.3s",
-              }}
-            >
-              <h3>🏥 {name}</h3>
-
-              <p style={{ color: "#94a3b8" }}>{type} Specialist</p>
-
-              <div style={{ marginTop: "10px" }}>
-                ⭐ {rating} | 120+ reviews
-              </div>
-
-              <p style={{ color: "#38bdf8", marginTop: "10px" }}>
-                📍 {h.distance.toFixed(2)} km away
-              </p>
-
-              <button
-                onClick={() => handleRoute(h)}
-                style={{
-                  marginTop: "12px",
-                  width: "100%",
-                  padding: "10px",
-                  borderRadius: "10px",
-                  border: "none",
-                  background: "linear-gradient(135deg, #22c55e, #16a34a)",
-                  color: "white",
-                  fontWeight: "bold",
-                }}
-              >
-                🚑 Book Ambulance
-              </button>
-            </div>
-          );
-        })}
-      </div>
+      {/* 🏥 LIST */}
+      {hospitals.map((h, i) => (
+        <div key={i} style={{ marginBottom: "10px" }}>
+          <b>🏥 {h.name}</b>
+          <br />
+          📍 {h.distance.toFixed(2)} km away
+          <br />
+          <button onClick={() => handleRoute(h)}>🚑 Book Ambulance</button>
+        </div>
+      ))}
     </div>
   );
 }
