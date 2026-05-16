@@ -15,7 +15,6 @@ export default function Emergency() {
           lng: pos.coords.longitude,
         };
 
-        // 🔥 fake nearby hospital
         const hospital = {
           lat: user.lat + 0.02,
           lng: user.lng + 0.02,
@@ -32,13 +31,12 @@ export default function Emergency() {
           ambulance,
         };
 
-        // ✅ store data
         localStorage.setItem("trackingData", JSON.stringify(data));
 
-        setLoading(false); // ✅ IMPORTANT FIX
+        setLoading(false);
 
-        // ✅ go to tracking page
-        navigate("/tracking");
+        // 🔥 IMPORTANT CHANGE
+        navigate("/map");
       },
       () => {
         alert("Location access denied");
@@ -58,7 +56,7 @@ export default function Emergency() {
 
         <button
           onClick={handleEmergency}
-          disabled={loading} // ✅ prevents double click
+          disabled={loading}
           style={{
             padding: "15px 25px",
             borderRadius: "12px",
