@@ -25,22 +25,22 @@ export default function Dashboard({ vehicles = [], signals = [] }) {
 
   return (
     <div>
-      <div className="title">🚦 Smart Traffic Dashboard</div>
+      <h2>🚦 Dashboard</h2>
 
-      <div className="grid">
+      <div style={{ display: "flex", gap: "20px" }}>
         <div className="card">
           <h3>Vehicles</h3>
-          <h1>{vehicles.length === 0 ? "—" : vCount}</h1>
+          <h1>{vCount}</h1>
         </div>
 
         <div className="card">
           <h3>Signals</h3>
-          <h1>{signals.length === 0 ? "—" : sCount}</h1>
+          <h1>{sCount}</h1>
         </div>
 
         <div className="card">
           <h3>Emergency</h3>
-          <h1 className="pulse">Active 🚑</h1>
+          <h1>🚑 Active</h1>
         </div>
       </div>
     </div>

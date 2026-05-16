@@ -4,7 +4,7 @@ import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { useNavigate } from "react-router-dom";
 
-/* 🔥 FIX LEAFLET ICON ISSUE */
+/* FIX marker issue */
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl:
@@ -16,97 +16,48 @@ L.Icon.Default.mergeOptions({
 export default function Hospitals() {
   const [hospitals, setHospitals] = useState([]);
   const [coords, setCoords] = useState(null);
-  const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
 
   const navigate = useNavigate();
 
-  /* 📏 DISTANCE */
-  function getDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371;
-    const dLat = ((lat2 - lat1) * Math.PI) / 180;
-    const dLon = ((lon2 - lon1) * Math.PI) / 180;
-
-    const a =
-      Math.sin(dLat / 2) ** 2 +
-      Math.cos((lat1 * Math.PI) / 180) *
-        Math.cos((lat2 * Math.PI) / 180) *
-        Math.sin(dLon / 2) ** 2;
-
-    return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  }
-
-  /* 🚀 FETCH FROM BACKEND */
-  const fetchHospitals = async (lat, lng, search = "") => {
+  /* FETCH */
+  const fetchHospitals = async (lat, lng) => {
     setLoading(true);
 
     try {
       const res = await fetch(
-        "https://astracare-backend.onrender.com/api/hospitals/search",
+        "https://astracare-backend.onrender.com/api/hospitals",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ lat, lng, query: search }),
+          body: JSON.stringify({ lat, lng }),
         },
       );
 
       const data = await res.json();
 
-      console.log("API RESPONSE 👉", data);
-
-      const sorted = (data.hospitals || [])
-        .map((h) => ({
-          ...h,
-          distance: getDistance(lat, lng, h.lat, h.lng),
-        }))
-        .sort((a, b) => a.distance - b.distance);
-
-      setHospitals(sorted);
+      setHospitals(data.hospitals || []);
       setCoords({ lat, lng });
     } catch (err) {
-      console.log("Fetch error:", err);
+      console.log(err);
     }
 
     setLoading(false);
   };
 
-  /* 📍 REAL USER LOCATION */
+  /* LOCATION */
   useEffect(() => {
-    if (!navigator.geolocation) {
-      fetchHospitals(17.385, 78.486);
-      return;
-    }
-
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-
-        console.log("USER LOCATION 👉", lat, lng);
-
-        fetchHospitals(lat, lng);
+        fetchHospitals(pos.coords.latitude, pos.coords.longitude);
       },
-      (err) => {
-        console.log("Location error:", err.message);
-
-        // fallback only if location fails
-        fetchHospitals(17.385, 78.486);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0,
+      () => {
+        fetchHospitals(17.385, 78.486); // fallback
       },
     );
   }, []);
 
-  /* 🔍 SEARCH */
-  const handleSearch = () => {
-    if (!coords) return;
-    fetchHospitals(coords.lat, coords.lng, query);
-  };
-
-  /* 🗺️ MAP CENTER */
+  /* MAP CENTER */
   function MapUpdater({ coords }) {
     const map = useMap();
 
@@ -119,7 +70,7 @@ export default function Hospitals() {
     return null;
   }
 
-  /* 🚑 BOOK AMBULANCE */
+  /* BOOK */
   const handleRoute = (h) => {
     const data = {
       user: coords,
@@ -131,27 +82,13 @@ export default function Hospitals() {
     navigate("/map");
   };
 
-  /* UI STATES */
-  if (loading) return <h2>Loading hospitals...</h2>;
-
-  if (hospitals.length === 0) return <h2>No hospitals found ❌</h2>;
+  if (loading) return <h2>Loading...</h2>;
 
   return (
     <div>
       <h2>🏥 Nearby Hospitals</h2>
 
-      {/* 🔍 SEARCH */}
-      <div style={{ marginBottom: "15px" }}>
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search hospital..."
-          style={{ padding: "8px", width: "70%" }}
-        />
-        <button onClick={handleSearch}>Search</button>
-      </div>
-
-      {/* 🗺️ MAP */}
+      {/* MAP */}
       {coords && (
         <div style={{ height: "300px", marginBottom: "20px" }}>
           <MapContainer
@@ -171,21 +108,10 @@ export default function Hospitals() {
         </div>
       )}
 
-      {/* 🏥 LIST */}
+      {/* LIST */}
       {hospitals.map((h, i) => (
-        <div
-          key={i}
-          style={{
-            background: "#1e293b",
-            color: "white",
-            padding: "12px",
-            marginBottom: "10px",
-            borderRadius: "10px",
-          }}
-        >
-          <h3>{h.name}</h3>
-          <p>📍 {h.distance.toFixed(2)} km away</p>
-
+        <div key={i}>
+          <p>{h.name}</p>
           <button onClick={() => handleRoute(h)}>🚑 Book Ambulance</button>
         </div>
       ))}

@@ -1,15 +1,10 @@
-import MapView from "../MapView";
+import MapView from "../components/MapView";
 
-export default function MapPage({ vehicles, signals, target }) {
+export default function MapPage() {
   return (
-    <div className="card">
+    <div>
       <h2>🗺️ Live Map</h2>
-
-      <div
-        style={{ height: "500px", borderRadius: "12px", overflow: "hidden" }}
-      >
-        <MapView vehicles={vehicles} signals={signals} target={target} />
-      </div>
+      <MapView />
     </div>
   );
 }
