@@ -10,43 +10,28 @@ import { useEffect, useState, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-/* 🔥 FIX DEFAULT ICON */
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl:
-    "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-});
-
-/* 🚑 AMBULANCE */
+/* ICONS */
 const ambulanceIcon = new L.Icon({
   iconUrl: "https://cdn-icons-png.flaticon.com/512/2967/2967350.png",
   iconSize: [42, 42],
-  iconAnchor: [21, 42],
 });
 
-/* 🚗 CAR */
 const carIcon = new L.Icon({
   iconUrl: "https://cdn-icons-png.flaticon.com/512/744/744465.png",
   iconSize: [28, 28],
-  iconAnchor: [14, 28],
 });
 
-/* 🚦 SIGNAL ICONS */
 const redSignal = new L.Icon({
   iconUrl: "https://cdn-icons-png.flaticon.com/512/463/463612.png",
   iconSize: [32, 32],
-  iconAnchor: [16, 32],
 });
 
 const greenSignal = new L.Icon({
   iconUrl: "https://cdn-icons-png.flaticon.com/512/463/463626.png",
   iconSize: [32, 32],
-  iconAnchor: [16, 32],
 });
 
-/* 🎯 FOLLOW AMBULANCE */
+/* FOLLOW MAP */
 function Follow({ pos }) {
   const map = useMap();
   useEffect(() => {
@@ -72,36 +57,45 @@ export default function MapView() {
 
     const fetchRoute = async () => {
       const res = await fetch(
-        `https://router.project-osrm.org/route/v1/driving/${ambulance.lng},${ambulance.lat};${user.lng},${user.lat}?overview=full&geometries=geojson`,
+        `https://router.project-osrm.org/route/v1/driving/${ambulance.lng},${ambulance.lat};${user.lng},${user.lat}?alternatives=true&overview=full&geometries=geojson`,
       );
 
       const json = await res.json();
 
-      const coords = json.routes[0].geometry.coordinates.map((c) => [
-        c[1],
-        c[0],
-      ]);
+      const routes = json.routes;
+
+      /* 🧠 choose best route (simulate traffic) */
+      const bestRoute = routes
+        .map((r) => ({
+          route: r,
+          score: r.duration + Math.random() * 200, // simulate congestion
+        }))
+        .sort((a, b) => a.score - b.score)[0].route;
+
+      const coords = bestRoute.geometry.coordinates.map((c) => [c[1], c[0]]);
 
       setRoute(coords);
       setAmbulancePos(coords[0]);
 
-      /* 🚦 SIGNALS (fixed positions) */
+      const total = coords.length;
+
+      /* 🚦 SIGNALS (SAFE) */
       setSignals([
-        { index: 30, status: "red" },
-        { index: 70, status: "red" },
+        { index: Math.floor(total * 0.3), status: "red" },
+        { index: Math.floor(total * 0.6), status: "red" },
       ]);
 
       /* 🚗 VEHICLES */
       setVehicles([
-        { id: 1, index: 20 },
-        { id: 2, index: 50 },
+        { id: 1, index: Math.floor(total * 0.2) },
+        { id: 2, index: Math.floor(total * 0.5) },
       ]);
     };
 
     fetchRoute();
   }, []);
 
-  /* 🚑 AMBULANCE MOVEMENT */
+  /* 🚑 AMBULANCE MOVE */
   useEffect(() => {
     if (!route.length) return;
 
@@ -115,11 +109,9 @@ export default function MapView() {
       /* 🚦 SIGNAL CONTROL */
       setSignals((prev) =>
         prev.map((s) => {
-          // ambulance near → GREEN
           if (Math.abs(s.index - ambIndex.current) < 5) {
             return { ...s, status: "green" };
           }
-          // after crossing → RED again
           if (ambIndex.current > s.index + 5) {
             return { ...s, status: "red" };
           }
@@ -131,7 +123,7 @@ export default function MapView() {
     return () => clearInterval(interval);
   }, [route]);
 
-  /* 🚗 VEHICLE BEHAVIOR */
+  /* 🚗 VEHICLE LOGIC */
   useEffect(() => {
     if (!route.length) return;
 
@@ -142,12 +134,10 @@ export default function MapView() {
             (s) => Math.abs(s.index - v.index) < 3,
           );
 
-          // 🔴 STOP if red signal
           if (signalAhead && signalAhead.status === "red") {
-            return v;
+            return v; // STOP
           }
 
-          // 🟢 MOVE if green
           return {
             ...v,
             index: (v.index + 1) % route.length,
@@ -173,7 +163,7 @@ export default function MapView() {
       {/* 🚑 AMBULANCE */}
       {ambulancePos && (
         <Marker position={ambulancePos} icon={ambulanceIcon}>
-          <Popup>🚑 Ambulance Priority</Popup>
+          <Popup>🚑 Priority Vehicle</Popup>
         </Marker>
       )}
 
