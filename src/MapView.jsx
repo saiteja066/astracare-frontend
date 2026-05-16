@@ -30,6 +30,10 @@ const ambulanceIcon = new L.Icon({
   iconSize: [35, 35],
 });
 
+console.log("vehicles:", vehicles);
+console.log("signals:", signals);
+console.log("target:", target);
+
 /* 🚦 TRAFFIC LOGIC */
 function getTrafficLevel(vehicles, lat, lng) {
   const nearby = vehicles.filter(
@@ -141,6 +145,3 @@ export default function MapView({ signals = [], target }) {
     </MapContainer>
   );
 }
-console.log("vehicles:", vehicles);
-console.log("signals:", signals);
-console.log("target:", target);
