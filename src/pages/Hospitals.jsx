@@ -7,10 +7,12 @@ export default function Hospitals() {
   const [hospitals, setHospitals] = useState([]);
   const [coords, setCoords] = useState(null);
   const [query, setQuery] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
   const navigate = useNavigate();
 
-  /* 📏 Distance */
+  /* 📏 DISTANCE */
   function getDistance(lat1, lon1, lat2, lon2) {
     const R = 6371;
     const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -25,9 +27,10 @@ export default function Hospitals() {
     return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
 
-  /* 🚀 Fetch hospitals */
+  /* 🚀 FETCH HOSPITALS */
   const fetchHospitals = async (lat, lng, searchQuery = "") => {
     setLoading(true);
+    setError("");
 
     try {
       const res = await fetch(
@@ -45,6 +48,8 @@ export default function Hospitals() {
 
       const data = await res.json();
 
+      console.log("API RESPONSE 👉", data);
+
       const sorted = (data.hospitals || [])
         .map((h) => ({
           ...h,
@@ -55,26 +60,33 @@ export default function Hospitals() {
       setHospitals(sorted);
       setCoords({ lat, lng });
     } catch (err) {
-      console.log(err);
+      console.log("Fetch error:", err);
+      setError("❌ Failed to load hospitals");
     }
 
     setLoading(false);
   };
 
-  /* 📍 Get current location */
+  /* 📍 GET LOCATION */
   useEffect(() => {
-    navigator.geolocation.getCurrentPosition((pos) => {
-      fetchHospitals(pos.coords.latitude, pos.coords.longitude);
-    });
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        fetchHospitals(pos.coords.latitude, pos.coords.longitude);
+      },
+      () => {
+        // 🔥 fallback (Hyderabad)
+        fetchHospitals(17.385, 78.486);
+      },
+    );
   }, []);
 
-  /* 🔍 Search */
+  /* 🔍 SEARCH */
   const handleSearch = () => {
     if (!coords) return;
     fetchHospitals(coords.lat, coords.lng, query);
   };
 
-  /* 🗺️ Map center updater */
+  /* 🗺️ MAP UPDATE */
   function MapUpdater({ coords }) {
     const map = useMap();
 
@@ -87,7 +99,7 @@ export default function Hospitals() {
     return null;
   }
 
-  /* 🚑 Book */
+  /* 🚑 BOOK AMBULANCE */
   const handleRoute = (h) => {
     const data = {
       user: coords,
@@ -108,14 +120,20 @@ export default function Hospitals() {
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search hospital name..."
+          placeholder="Search hospital..."
           style={{ padding: "8px", width: "70%" }}
         />
         <button onClick={handleSearch}>Search</button>
       </div>
 
       {/* 🔄 LOADING */}
-      {loading && <p>Loading...</p>}
+      {loading && <p>🔄 Loading hospitals...</p>}
+
+      {/* ❌ ERROR */}
+      {error && <p>{error}</p>}
+
+      {/* ❌ NO DATA */}
+      {!loading && hospitals.length === 0 && <p>No hospitals found ❌</p>}
 
       {/* 🗺️ MAP */}
       {coords && (
@@ -126,12 +144,15 @@ export default function Hospitals() {
             style={{ height: "100%" }}
           >
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-
             <MapUpdater coords={coords} />
 
             {hospitals.map((h, i) => (
               <Marker key={i} position={[h.lat, h.lng]}>
-                <Popup>{h.name}</Popup>
+                <Popup>
+                  <b>{h.name}</b>
+                  <br />
+                  📍 {h.distance.toFixed(2)} km
+                </Popup>
               </Marker>
             ))}
           </MapContainer>
