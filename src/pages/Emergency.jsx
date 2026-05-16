@@ -15,7 +15,6 @@ export default function Emergency({ setTarget }) {
           lng: pos.coords.longitude,
         };
 
-        // 🚑 SET AMBULANCE LOCATION (IMPORTANT)
         setTarget({
           ambulance: {
             lat: user.lat + 0.01,
@@ -24,13 +23,10 @@ export default function Emergency({ setTarget }) {
         });
 
         setLoading(false);
-
-        // 🚀 GO TO MAP PAGE
         navigate("/map");
       },
-      (err) => {
-        console.log(err);
-        alert("❌ Location access denied");
+      () => {
+        alert("Location denied");
         setLoading(false);
       },
     );
@@ -38,35 +34,10 @@ export default function Emergency({ setTarget }) {
 
   return (
     <div>
-      <h2 className="title">🚨 Emergency Assistance</h2>
-
-      <div
-        className="card"
-        style={{
-          textAlign: "center",
-          padding: "30px",
-        }}
-      >
-        <p style={{ marginBottom: "20px", fontSize: "16px" }}>
-          Request ambulance immediately to your location
-        </p>
-
-        <button
-          onClick={handleEmergency}
-          style={{
-            padding: "15px 25px",
-            borderRadius: "12px",
-            border: "none",
-            background: "linear-gradient(135deg, #ef4444, #dc2626)",
-            color: "white",
-            fontSize: "16px",
-            fontWeight: "bold",
-            cursor: "pointer",
-          }}
-        >
-          {loading ? "Requesting..." : "🚑 Request Ambulance"}
-        </button>
-      </div>
+      <h2>🚨 Emergency</h2>
+      <button onClick={handleEmergency}>
+        {loading ? "..." : "🚑 Request Ambulance"}
+      </button>
     </div>
   );
 }
