@@ -1,12 +1,6 @@
 import { useEffect, useState } from "react";
-import {
-  MapContainer,
-  TileLayer,
-  Marker,
-  Popup,
-  useMapEvents,
-  useMap,
-} from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import "leaflet/dist/leaflet.css";
 import { useNavigate } from "react-router-dom";
 
 export default function Hospitals() {
@@ -14,10 +8,11 @@ export default function Hospitals() {
   const [coords, setCoords] = useState(null);
   const [place, setPlace] = useState("");
   const [error, setError] = useState("");
+  const [loaded, setLoaded] = useState(false);
 
   const navigate = useNavigate();
 
-  // 📏 DISTANCE
+  /* 📏 DISTANCE */
   function getDistance(lat1, lon1, lat2, lon2) {
     const R = 6371;
     const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -32,32 +27,7 @@ export default function Hospitals() {
     return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
 
-  // 🧠 SPECIALIZATION
-  function getDescription(h) {
-    const name = h.tags?.name?.toLowerCase() || "";
-
-    let specialization = "Multi-speciality";
-
-    if (name.includes("women") || name.includes("maternity")) {
-      specialization = "Gynecology";
-    } else if (name.includes("heart") || name.includes("cardiac")) {
-      specialization = "Cardiology";
-    } else if (name.includes("child") || name.includes("kids")) {
-      specialization = "Pediatrics";
-    } else if (name.includes("ortho")) {
-      specialization = "Orthopedic";
-    } else if (name.includes("eye")) {
-      specialization = "Ophthalmology";
-    } else if (name.includes("dental")) {
-      specialization = "Dental";
-    }
-
-    const operator = h.tags?.operator || "Private";
-
-    return `${specialization} • ${operator}`;
-  }
-
-  // 🚀 FETCH
+  /* 🚀 FETCH FROM BACKEND */
   const fetchHospitals = async (lat, lng) => {
     setError("");
 
@@ -73,10 +43,15 @@ export default function Hospitals() {
         },
       );
 
+      if (res.status === 503) {
+        setError("⚠️ Server busy, try again");
+        return;
+      }
+
       const data = await res.json();
 
       if (!data.elements?.length) {
-        setError("⚠️ No hospitals found nearby");
+        setError("No hospitals found nearby");
       }
 
       const sorted = data.elements
@@ -90,62 +65,55 @@ export default function Hospitals() {
       setCoords({ lat, lng });
     } catch (err) {
       console.log(err);
-      setError("❌ Hospital service busy, try again");
+      setError("❌ Failed to load hospitals");
     }
   };
 
-  // 📍 AUTO LOCATION
+  /* 📍 AUTO LOCATION */
   useEffect(() => {
+    if (loaded) return;
+
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         fetchHospitals(pos.coords.latitude, pos.coords.longitude);
+        setLoaded(true);
       },
       () => setError("❌ Location denied"),
     );
-  }, []);
+  }, [loaded]);
 
-  // 🔍 SEARCH
+  /* 🔍 SEARCH LOCATION */
   const handleSearch = async () => {
     if (!place) return;
 
-    const geoRes = await fetch(
+    const res = await fetch(
       `https://nominatim.openstreetmap.org/search?format=json&q=${place}`,
     );
 
-    const geoData = await geoRes.json();
+    const data = await res.json();
 
-    if (!geoData.length) {
+    if (!data.length) {
       setError("❌ Location not found");
       return;
     }
 
-    fetchHospitals(parseFloat(geoData[0].lat), parseFloat(geoData[0].lon));
+    fetchHospitals(parseFloat(data[0].lat), parseFloat(data[0].lon));
   };
 
-  // 🖱️ MAP CLICK
-  function MapClickHandler() {
-    useMapEvents({
-      click(e) {
-        fetchHospitals(e.latlng.lat, e.latlng.lng);
-      },
-    });
-    return null;
-  }
-
-  // 🔥 AUTO MOVE MAP
+  /* 🗺️ MAP AUTO MOVE */
   function MapUpdater({ coords }) {
     const map = useMap();
 
-    if (coords) {
-      map.flyTo([coords.lat, coords.lng], 14, {
-        duration: 1.5,
-      });
-    }
+    useEffect(() => {
+      if (coords) {
+        map.flyTo([coords.lat, coords.lng], 14);
+      }
+    }, [coords]);
 
     return null;
   }
 
-  // 🚑 ROUTE
+  /* 🚑 ROUTE */
   const handleRoute = (h) => {
     const data = {
       user: coords,
@@ -167,12 +135,7 @@ export default function Hospitals() {
       {/* 🔍 SEARCH */}
       <div
         className="card"
-        style={{
-          display: "flex",
-          gap: "10px",
-          padding: "15px",
-          marginBottom: "20px",
-        }}
+        style={{ display: "flex", gap: "10px", marginBottom: "20px" }}
       >
         <input
           value={place}
@@ -183,50 +146,29 @@ export default function Hospitals() {
             padding: "12px",
             borderRadius: "10px",
             border: "none",
-            background: "rgba(255,255,255,0.1)",
-            color: "white",
           }}
         />
         <button onClick={handleSearch}>🔍</button>
       </div>
 
       {/* ❌ ERROR */}
-      {error && hospitals.length === 0 && (
-        <div className="card" style={{ color: "#f87171" }}>
-          {error}
-        </div>
-      )}
+      {error && <div className="card">{error}</div>}
 
       {/* 🗺️ MAP */}
       {coords && (
-        <div
-          style={{
-            height: "260px",
-            marginBottom: "25px",
-            borderRadius: "16px",
-            overflow: "hidden",
-          }}
-        >
+        <div style={{ height: "250px", marginBottom: "20px" }}>
           <MapContainer
             center={[coords.lat, coords.lng]}
-            zoom={14}
+            zoom={13}
             style={{ height: "100%" }}
           >
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-
             <MapUpdater coords={coords} />
-            <MapClickHandler />
-
-            <Marker position={[coords.lat, coords.lng]}>
-              <Popup>📍 Selected Location</Popup>
-            </Marker>
 
             {hospitals.map((h, i) => (
               <Marker key={i} position={[h.lat, h.lon]}>
                 <Popup>
                   <b>{h.tags?.name || "Hospital"}</b>
-                  <br />
-                  {getDescription(h)}
                   <br />
                   📏 {h.distance.toFixed(2)} km
                 </Popup>
@@ -240,7 +182,7 @@ export default function Hospitals() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
           gap: "20px",
         }}
       >
@@ -248,25 +190,9 @@ export default function Hospitals() {
           <div key={i} className="card">
             <h3>{h.tags?.name || "Hospital"}</h3>
 
-            <p style={{ color: "#94a3b8" }}>{getDescription(h)}</p>
+            <p>📍 {h.distance.toFixed(2)} km away</p>
 
-            <p style={{ color: "#38bdf8" }}>
-              📍 {h.distance.toFixed(2)} km away
-            </p>
-
-            <button
-              onClick={() => handleRoute(h)}
-              style={{
-                marginTop: "10px",
-                padding: "10px",
-                borderRadius: "10px",
-                border: "none",
-                background: "linear-gradient(135deg, #22c55e, #16a34a)",
-                color: "white",
-              }}
-            >
-              🏥 Choose This Hospital
-            </button>
+            <button onClick={() => handleRoute(h)}>🚑 Select Hospital</button>
           </div>
         ))}
       </div>
