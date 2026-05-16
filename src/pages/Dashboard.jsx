@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
 
-export default function Dashboard({ vehicles = [], signals = [] }) {
+export default function Dashboard({ vehicles, signals }) {
   const [vCount, setVCount] = useState(0);
   const [sCount, setSCount] = useState(0);
 
-  /* 🔢 ANIMATION COUNTER */
   useEffect(() => {
     let v = 0;
     let s = 0;
 
+    // ✅ SAFE LENGTH
     const vLen = Array.isArray(vehicles) ? vehicles.length : 0;
     const sLen = Array.isArray(signals) ? signals.length : 0;
 
