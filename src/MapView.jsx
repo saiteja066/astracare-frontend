@@ -40,12 +40,20 @@ export default function MapView() {
 
   const ambIndex = useRef(0);
 
-  /* 📦 LOAD USER */
-  const data = JSON.parse(localStorage.getItem("trackingData"));
+  /* 📦 SAFE LOAD */
+  let data = null;
+  try {
+    data = JSON.parse(localStorage.getItem("trackingData"));
+  } catch {
+    data = null;
+  }
 
-  /* 🔎 SEARCH (ONLY WHEN TYPING) */
+  const userLat = data?.user?.lat || 17.385; // fallback (Hyderabad)
+  const userLng = data?.user?.lng || 78.486;
+
+  /* 🔎 SEARCH */
   useEffect(() => {
-    if (!data || query.length < 2) {
+    if (!data?.user || query.length < 2) {
       setResults([]);
       return;
     }
@@ -60,17 +68,23 @@ export default function MapView() {
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              lat: data.user.lat,
-              lng: data.user.lng,
+              lat: userLat,
+              lng: userLng,
               query,
             }),
           },
         );
 
+        if (!res.ok) {
+          const text = await res.text();
+          console.error("API ERROR:", text);
+          return;
+        }
+
         const result = await res.json();
         setResults(result.hospitals || []);
       } catch (err) {
-        console.log(err);
+        console.log("Fetch error:", err);
       }
     };
 
@@ -78,12 +92,10 @@ export default function MapView() {
     return () => clearTimeout(delay);
   }, [query]);
 
-  /* 🚀 ROUTE ONLY AFTER SELECT */
+  /* 🚀 ROUTE */
   const createRoute = async (hospital) => {
-    if (!data) return;
-
     const res = await fetch(
-      `https://router.project-osrm.org/route/v1/driving/${data.user.lng},${data.user.lat};${hospital.lng},${hospital.lat}?overview=full&geometries=geojson`,
+      `https://router.project-osrm.org/route/v1/driving/${userLng},${userLat};${hospital.lng},${hospital.lat}?overview=full&geometries=geojson`,
     );
 
     const json = await res.json();
@@ -91,7 +103,7 @@ export default function MapView() {
     const coords = json.routes[0].geometry.coordinates.map((c) => [c[1], c[0]]);
 
     setRoute(coords);
-    setAmbulancePos([data.user.lat, data.user.lng]);
+    setAmbulancePos([userLat, userLng]);
     ambIndex.current = 0;
   };
 
@@ -115,7 +127,7 @@ export default function MapView() {
   /* 🔘 SEARCH BUTTON */
   const handleSearch = () => {
     if (results.length > 0) {
-      const hospital = results[0]; // best match
+      const hospital = results[0];
       setSelectedHospital(hospital);
       createRoute(hospital);
       setResults([]);
@@ -124,7 +136,6 @@ export default function MapView() {
 
   return (
     <div style={{ padding: "20px" }}>
-      {/* 🔥 CLEAN SEARCH BAR */}
       <div style={{ maxWidth: "500px", marginBottom: "10px" }}>
         <div style={{ display: "flex", gap: "10px" }}>
           <input
@@ -136,38 +147,14 @@ export default function MapView() {
               padding: "12px",
               borderRadius: "10px",
               border: "1px solid #ccc",
-              fontSize: "14px",
             }}
           />
 
-          <button
-            onClick={handleSearch}
-            style={{
-              padding: "12px 20px",
-              borderRadius: "10px",
-              border: "none",
-              background: "#2563eb",
-              color: "white",
-              cursor: "pointer",
-              fontWeight: "bold",
-            }}
-          >
-            Search
-          </button>
+          <button onClick={handleSearch}>Search</button>
         </div>
 
-        {/* 🔥 SUGGESTIONS */}
         {results.length > 0 && (
-          <div
-            style={{
-              background: "white",
-              borderRadius: "10px",
-              marginTop: "5px",
-              boxShadow: "0 4px 10px rgba(0,0,0,0.1)",
-              maxHeight: "200px",
-              overflowY: "auto",
-            }}
-          >
+          <div>
             {results.map((r, i) => (
               <div
                 key={i}
@@ -177,11 +164,6 @@ export default function MapView() {
                   setResults([]);
                   createRoute(r);
                 }}
-                style={{
-                  padding: "10px",
-                  cursor: "pointer",
-                  borderBottom: "1px solid #eee",
-                }}
               >
                 🏥 {r.name}
               </div>
@@ -190,22 +172,17 @@ export default function MapView() {
         )}
       </div>
 
-      {/* 🗺️ MAP */}
       <MapContainer
-        center={[data?.user.lat || 17.24, data?.user.lng || 78.24]}
+        center={[userLat, userLng]}
         zoom={13}
-        style={{ height: "500px", borderRadius: "15px" }}
+        style={{ height: "500px" }}
       >
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
         <Follow pos={ambulancePos} />
 
-        {/* ROUTE */}
-        {route.length > 0 && (
-          <Polyline positions={route} pathOptions={{ color: "#22c55e" }} />
-        )}
+        {route.length > 0 && <Polyline positions={route} />}
 
-        {/* HOSPITAL */}
         {selectedHospital && (
           <Marker
             position={[selectedHospital.lat, selectedHospital.lng]}
@@ -215,7 +192,6 @@ export default function MapView() {
           </Marker>
         )}
 
-        {/* AMBULANCE */}
         {ambulancePos && (
           <Marker position={ambulancePos} icon={ambulanceIcon}>
             <Popup>🚑 Ambulance</Popup>
