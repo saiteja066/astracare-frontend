@@ -4,7 +4,7 @@ import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { useNavigate } from "react-router-dom";
 
-/* 🔥 FIX LEAFLET MARKER ISSUE */
+/* 🔥 FIX LEAFLET ICON ISSUE */
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl:
@@ -36,7 +36,7 @@ export default function Hospitals() {
     return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
 
-  /* 🚀 FETCH */
+  /* 🚀 FETCH FROM BACKEND */
   const fetchHospitals = async (lat, lng, search = "") => {
     setLoading(true);
 
@@ -46,17 +46,13 @@ export default function Hospitals() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            lat,
-            lng,
-            query: search,
-          }),
+          body: JSON.stringify({ lat, lng, query: search }),
         },
       );
 
       const data = await res.json();
 
-      console.log("API 👉", data);
+      console.log("API RESPONSE 👉", data);
 
       const sorted = (data.hospitals || [])
         .map((h) => ({
@@ -74,15 +70,32 @@ export default function Hospitals() {
     setLoading(false);
   };
 
-  /* 📍 LOCATION */
+  /* 📍 REAL USER LOCATION */
   useEffect(() => {
+    if (!navigator.geolocation) {
+      fetchHospitals(17.385, 78.486);
+      return;
+    }
+
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        fetchHospitals(pos.coords.latitude, pos.coords.longitude);
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+
+        console.log("USER LOCATION 👉", lat, lng);
+
+        fetchHospitals(lat, lng);
       },
-      () => {
-        // fallback
+      (err) => {
+        console.log("Location error:", err.message);
+
+        // fallback only if location fails
         fetchHospitals(17.385, 78.486);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
       },
     );
   }, []);
@@ -106,7 +119,7 @@ export default function Hospitals() {
     return null;
   }
 
-  /* 🚑 BOOK */
+  /* 🚑 BOOK AMBULANCE */
   const handleRoute = (h) => {
     const data = {
       user: coords,
@@ -125,7 +138,7 @@ export default function Hospitals() {
 
   return (
     <div>
-      <h2>🏥 Hospitals Near You</h2>
+      <h2>🏥 Nearby Hospitals</h2>
 
       {/* 🔍 SEARCH */}
       <div style={{ marginBottom: "15px" }}>
@@ -147,7 +160,6 @@ export default function Hospitals() {
             style={{ height: "100%" }}
           >
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-
             <MapUpdater coords={coords} />
 
             {hospitals.map((h, i) => (
