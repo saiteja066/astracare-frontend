@@ -9,34 +9,57 @@ export default function Emergency() {
     setLoading(true);
 
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
+      async (pos) => {
         const user = {
           lat: pos.coords.latitude,
           lng: pos.coords.longitude,
         };
 
-        const hospital = {
-          lat: user.lat + 0.02,
-          lng: user.lng + 0.02,
-        };
+        try {
+          /* 🔥 CALL BACKEND */
+          const res = await fetch(
+            "http://localhost:5000/api/hospitals/emergency",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(user),
+            },
+          );
 
-        const ambulance = {
-          lat: user.lat + 0.01,
-          lng: user.lng + 0.01,
-        };
+          const data = await res.json();
 
-        const data = {
-          user,
-          hospital,
-          ambulance,
-        };
+          if (!data.hospitals || data.hospitals.length === 0) {
+            alert("No hospitals found nearby");
+            setLoading(false);
+            return;
+          }
 
-        localStorage.setItem("trackingData", JSON.stringify(data));
+          /* ✅ PICK NEAREST */
+          const hospital = data.hospitals[0];
+
+          /* 🚑 AMBULANCE STARTS FROM USER */
+          const ambulance = {
+            lat: user.lat,
+            lng: user.lng,
+          };
+
+          const trackingData = {
+            user,
+            hospital,
+            ambulance,
+          };
+
+          localStorage.setItem("trackingData", JSON.stringify(trackingData));
+
+          navigate("/map");
+        } catch (err) {
+          console.log(err);
+          alert("Error fetching hospital");
+        }
 
         setLoading(false);
-
-        // 🔥 IMPORTANT CHANGE
-        navigate("/map");
       },
       () => {
         alert("Location access denied");
