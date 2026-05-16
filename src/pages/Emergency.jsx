@@ -1,13 +1,9 @@
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 export default function Emergency({ setTarget }) {
-  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleEmergency = () => {
-    setLoading(true);
-
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const user = {
@@ -20,28 +16,17 @@ export default function Emergency({ setTarget }) {
           lng: user.lng + 0.01,
         };
 
-        const hospital = {
-          lat: user.lat + 0.02,
-          lng: user.lng + 0.02,
-        };
+        // 🔥 STORE DATA
+        localStorage.setItem("trackingData", JSON.stringify({ ambulance }));
 
-        // ✅ STORE DATA (MOST IMPORTANT)
-        localStorage.setItem(
-          "trackingData",
-          JSON.stringify({ user, ambulance, hospital }),
-        );
-
-        // ✅ UPDATE STATE
+        // 🔥 UPDATE STATE
         setTarget({ ambulance });
 
-        setLoading(false);
-
-        // 🔥 GO TO MAP (NOT tracking)
+        // 🔥 GO TO MAP
         navigate("/map");
       },
       () => {
         alert("Location error");
-        setLoading(false);
       },
     );
   };
@@ -49,9 +34,8 @@ export default function Emergency({ setTarget }) {
   return (
     <div>
       <h2>🚨 Emergency</h2>
-      <button onClick={handleEmergency}>
-        {loading ? "..." : "🚑 Request Ambulance"}
-      </button>
+
+      <button onClick={handleEmergency}>🚑 Request Ambulance</button>
     </div>
   );
 }

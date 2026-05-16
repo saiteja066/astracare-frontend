@@ -1,10 +1,4 @@
-import {
-  MapContainer,
-  TileLayer,
-  Marker,
-  Polyline,
-  Popup,
-} from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import { useEffect, useState } from "react";
 import { io } from "socket.io-client";
 import L from "leaflet";
@@ -20,89 +14,35 @@ L.Icon.Default.mergeOptions({
 });
 
 /* SOCKET */
-const socket = io("https://astracare-backend.onrender.com", {
-  transports: ["polling", "websocket"],
-});
+const socket = io("https://astracare-backend.onrender.com");
 
 /* ICONS */
-const vehicleIcon = new L.Icon({
-  iconUrl: "https://cdn-icons-png.flaticon.com/512/743/743922.png",
-  iconSize: [25, 25],
-});
-
 const ambulanceIcon = new L.Icon({
   iconUrl: "https://cdn-icons-png.flaticon.com/512/2967/2967350.png",
   iconSize: [35, 35],
 });
 
-export default function MapView() {
+export default function MapView({ signals = [] }) {
   const [vehicles, setVehicles] = useState([]);
-  const [route, setRoute] = useState([]);
-  const [ambulancePos, setAmbulancePos] = useState(null);
 
   /* SOCKET VEHICLES */
   useEffect(() => {
     socket.on("vehicleUpdate", (data) => {
-      if (Array.isArray(data)) setVehicles(data);
+      if (Array.isArray(data)) {
+        setVehicles(data);
+      }
     });
+
     return () => socket.off("vehicleUpdate");
   }, []);
 
-  /* LOAD DATA */
+  /* 🔥 GET AMBULANCE FROM STORAGE */
   let stored = null;
   try {
     stored = JSON.parse(localStorage.getItem("trackingData"));
   } catch {}
 
-  console.log("MAP DATA:", stored);
-
-  /* FETCH ROUTE */
-  useEffect(() => {
-    if (!stored?.user || !stored?.ambulance) return;
-
-    const fetchRoute = async () => {
-      try {
-        const url = `https://router.project-osrm.org/route/v1/driving/${stored.ambulance.lng},${stored.ambulance.lat};${stored.user.lng},${stored.user.lat}?overview=full&geometries=geojson`;
-
-        const res = await fetch(url);
-        const result = await res.json();
-
-        console.log("ROUTE:", result);
-
-        if (result?.routes?.length > 0) {
-          const coords = result.routes[0].geometry.coordinates.map((c) => [
-            c[1],
-            c[0],
-          ]);
-
-          setRoute(coords);
-          setAmbulancePos(coords[0]);
-        }
-      } catch (err) {
-        console.log(err);
-      }
-    };
-
-    fetchRoute();
-  }, []);
-
-  /* ANIMATE */
-  useEffect(() => {
-    if (!route.length) return;
-
-    let i = 0;
-
-    const interval = setInterval(() => {
-      if (i < route.length) {
-        setAmbulancePos(route[i]);
-        i++;
-      } else {
-        clearInterval(interval);
-      }
-    }, 300);
-
-    return () => clearInterval(interval);
-  }, [route]);
+  const ambulance = stored?.ambulance;
 
   return (
     <MapContainer center={[17.24, 78.24]} zoom={13} style={{ height: "500px" }}>
@@ -110,18 +50,15 @@ export default function MapView() {
 
       {/* 🚗 VEHICLES */}
       {vehicles.map((v, i) => (
-        <Marker key={i} position={[v.lat, v.lng]} icon={vehicleIcon}>
+        <Marker key={i} position={[v.lat, v.lng]}>
           <Popup>🚗</Popup>
         </Marker>
       ))}
 
-      {/* 🛣️ ROUTE */}
-      {route.length > 0 && <Polyline positions={route} color="green" />}
-
-      {/* 🚑 AMBULANCE */}
-      {ambulancePos && (
-        <Marker position={ambulancePos} icon={ambulanceIcon}>
-          <Popup>🚑 Moving</Popup>
+      {/* 🚑 AMBULANCE (ONLY THIS ADDED) */}
+      {ambulance && (
+        <Marker position={[ambulance.lat, ambulance.lng]} icon={ambulanceIcon}>
+          <Popup>🚑 Ambulance</Popup>
         </Marker>
       )}
     </MapContainer>
