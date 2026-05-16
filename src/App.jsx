@@ -6,7 +6,6 @@ import {
   Navigate,
 } from "react-router-dom";
 
-// Pages
 import Dashboard from "./pages/Dashboard";
 import MapPage from "./pages/MapPage";
 import Analytics from "./pages/Analytics";
@@ -18,25 +17,19 @@ import Register from "./pages/Register";
 import Sidebar from "./Sidebar";
 
 function App() {
-  // ✅ DEFAULT TARGET (IMPORTANT FIX)
-  const [target, setTarget] = useState({
-    ambulance: { lat: 17.21, lng: 78.21 },
-  });
+  const [target, setTarget] = useState(null);
 
-  // ✅ SIGNALS OK
   const signals = [
     { id: 1, lat: 17.22, lng: 78.22 },
     { id: 2, lat: 17.26, lng: 78.27 },
   ];
 
-  /* 🔐 PROTECTED ROUTE */
   function ProtectedRoute({ children }) {
     const token = localStorage.getItem("token");
     if (!token) return <Navigate to="/login" replace />;
     return children;
   }
 
-  /* 🔓 PUBLIC ROUTE */
   function PublicRoute({ children }) {
     const token = localStorage.getItem("token");
     if (token) return <Navigate to="/" replace />;
@@ -50,7 +43,6 @@ function App() {
 
         <div style={{ flex: 1, padding: "20px" }}>
           <Routes>
-            {/* 🔓 LOGIN */}
             <Route
               path="/login"
               element={
@@ -59,8 +51,6 @@ function App() {
                 </PublicRoute>
               }
             />
-
-            {/* 🔓 REGISTER */}
             <Route
               path="/register"
               element={
@@ -70,7 +60,6 @@ function App() {
               }
             />
 
-            {/* 🔐 DASHBOARD */}
             <Route
               path="/"
               element={
@@ -80,7 +69,6 @@ function App() {
               }
             />
 
-            {/* 🔐 MAP */}
             <Route
               path="/map"
               element={
@@ -90,7 +78,6 @@ function App() {
               }
             />
 
-            {/* 🔐 ANALYTICS */}
             <Route
               path="/analytics"
               element={
@@ -100,7 +87,6 @@ function App() {
               }
             />
 
-            {/* 🔐 HOSPITALS */}
             <Route
               path="/hospitals"
               element={
@@ -110,7 +96,6 @@ function App() {
               }
             />
 
-            {/* 🚑 EMERGENCY */}
             <Route
               path="/emergency"
               element={
@@ -120,7 +105,6 @@ function App() {
               }
             />
 
-            {/* 🚑 TRACKING */}
             <Route
               path="/tracking"
               element={
@@ -130,7 +114,6 @@ function App() {
               }
             />
 
-            {/* 🔄 FALLBACK */}
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </div>

@@ -1,17 +1,10 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 
 export default function Dashboard({ vehicles = [], signals = [] }) {
   const [vCount, setVCount] = useState(0);
   const [sCount, setSCount] = useState(0);
 
-  const navigate = useNavigate();
-
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    window.location.href = "/login";
-  };
-
+  /* 🔢 ANIMATION COUNTER */
   useEffect(() => {
     let v = 0;
     let s = 0;
@@ -37,14 +30,6 @@ export default function Dashboard({ vehicles = [], signals = [] }) {
   return (
     <div>
       <div className="title">🚦 Smart Traffic Dashboard</div>
-
-      <div
-        className="logout"
-        onClick={handleLogout}
-        style={{ cursor: "pointer" }}
-      >
-        Logout
-      </div>
 
       <div className="grid">
         <div className="card">
