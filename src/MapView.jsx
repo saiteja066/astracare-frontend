@@ -5,8 +5,19 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet.heat";
 
+/* 🔥 FIX LEAFLET ICON BUG */
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl:
+    "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+});
+
 /* 🔌 SOCKET */
-const socket = io("https://astracare-backend.onrender.com");
+const socket = io("https://astracare-backend.onrender.com", {
+  transports: ["websocket"],
+});
 
 /* 🚦 SIGNAL ICONS */
 const redSignal = new L.Icon({
@@ -24,11 +35,11 @@ const greenSignal = new L.Icon({
   iconSize: [25, 25],
 });
 
-/* 🚑 ICON */
 const ambulanceIcon = new L.Icon({
   iconUrl: "https://cdn-icons-png.flaticon.com/512/2967/2967350.png",
   iconSize: [35, 35],
 });
+
 /* 🚦 TRAFFIC LOGIC */
 function getTrafficLevel(vehicles, lat, lng) {
   const nearby = vehicles.filter(
@@ -52,7 +63,7 @@ function getSignalIcon(status) {
   return greenSignal;
 }
 
-/* 🔥 HEATMAP COMPONENT (FIXED) */
+/* 🔥 HEATMAP */
 function Heatmap({ vehicles }) {
   const map = useMap();
 
@@ -72,20 +83,19 @@ function Heatmap({ vehicles }) {
 
     heatLayer.addTo(map);
 
-    return () => {
-      map.removeLayer(heatLayer);
-    };
+    return () => map.removeLayer(heatLayer);
   }, [vehicles, map]);
 
   return null;
 }
 
-export default function MapView({ signals = [], target }) {
+export default function MapView({ signals = [], target = {} }) {
   const [vehicles, setVehicles] = useState([]);
 
-  /* 🚗 SOCKET DATA */
+  /* 🚗 SOCKET */
   useEffect(() => {
     socket.on("vehicleUpdate", (data) => {
+      console.log("Socket data:", data);
       setVehicles(data);
     });
 
@@ -94,19 +104,18 @@ export default function MapView({ signals = [], target }) {
 
   return (
     <MapContainer
-      center={[17.385, 78.4867]}
-      zoom={13}
+      center={[17.24, 78.24]} // ✅ FIXED CENTER (IMPORTANT)
+      zoom={12}
       style={{ height: "500px", width: "100%" }}
     >
       <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
-      {/* 🔥 HEATMAP */}
       <Heatmap vehicles={vehicles} />
 
       {/* 🚗 VEHICLES */}
       {vehicles.map((v, i) => (
         <Marker key={i} position={[v.lat, v.lng]}>
-          <Popup>🚗 Speed: {v.speed.toFixed(1)} km/h</Popup>
+          <Popup>🚗 Speed: {v.speed?.toFixed(1)} km/h</Popup>
         </Marker>
       ))}
 
@@ -120,10 +129,7 @@ export default function MapView({ signals = [], target }) {
             position={[s.lat, s.lng]}
             icon={getSignalIcon(traffic)}
           >
-            <Popup>
-              🚦 Signal <br />
-              Traffic: {traffic}
-            </Popup>
+            <Popup>🚦 Traffic: {traffic}</Popup>
           </Marker>
         );
       })}

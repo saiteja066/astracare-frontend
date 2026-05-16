@@ -1,92 +1,36 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-export default function Emergency() {
+export default function Emergency({ setTarget }) {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  /* 📏 DISTANCE */
-  function getDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371;
-    const dLat = ((lat2 - lat1) * Math.PI) / 180;
-    const dLon = ((lon2 - lon1) * Math.PI) / 180;
-
-    const a =
-      Math.sin(dLat / 2) ** 2 +
-      Math.cos((lat1 * Math.PI) / 180) *
-        Math.cos((lat2 * Math.PI) / 180) *
-        Math.sin(dLon / 2) ** 2;
-
-    return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  }
-
-  /* 🚑 EMERGENCY */
   const handleEmergency = () => {
     setLoading(true);
 
     navigator.geolocation.getCurrentPosition(
-      async (pos) => {
+      (pos) => {
         const user = {
           lat: pos.coords.latitude,
           lng: pos.coords.longitude,
         };
 
-        try {
-          // 🔥 fetch hospitals from backend
-          const res = await fetch(
-            "https://astracare-backend.onrender.com/hospitals",
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(user),
-            },
-          );
-
-          const data = await res.json();
-
-          if (!data.elements?.length) {
-            alert("No hospitals found");
-            setLoading(false);
-            return;
-          }
-
-          // 🔥 find nearest hospital
-          const nearest = data.elements
-            .map((h) => ({
-              ...h,
-              distance: getDistance(user.lat, user.lng, h.lat, h.lon),
-            }))
-            .sort((a, b) => a.distance - b.distance)[0];
-
-          const hospital = {
-            lat: nearest.lat,
-            lng: nearest.lon,
-          };
-
-          const ambulance = {
+        // 🚑 SET AMBULANCE LOCATION (IMPORTANT)
+        setTarget({
+          ambulance: {
             lat: user.lat + 0.01,
             lng: user.lng + 0.01,
-          };
+          },
+        });
 
-          const trackingData = {
-            user,
-            hospital,
-            ambulance,
-          };
+        setLoading(false);
 
-          // ✅ store
-          localStorage.setItem("trackingData", JSON.stringify(trackingData));
-
-          // ✅ navigate
-          navigate("/tracking");
-        } catch (err) {
-          console.log(err);
-          alert("Emergency request failed");
-          setLoading(false);
-        }
+        // 🚀 GO TO MAP PAGE
+        navigate("/map");
       },
-      () => {
-        alert("Location access denied");
+      (err) => {
+        console.log(err);
+        alert("❌ Location access denied");
         setLoading(false);
       },
     );
@@ -96,8 +40,14 @@ export default function Emergency() {
     <div>
       <h2 className="title">🚨 Emergency Assistance</h2>
 
-      <div className="card" style={{ textAlign: "center" }}>
-        <p style={{ marginBottom: "20px" }}>
+      <div
+        className="card"
+        style={{
+          textAlign: "center",
+          padding: "30px",
+        }}
+      >
+        <p style={{ marginBottom: "20px", fontSize: "16px" }}>
           Request ambulance immediately to your location
         </p>
 

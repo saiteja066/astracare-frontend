@@ -18,44 +18,34 @@ import Register from "./pages/Register";
 import Sidebar from "./Sidebar";
 
 function App() {
-  const [target, setTarget] = useState(null);
+  // ✅ DEFAULT TARGET (IMPORTANT FIX)
+  const [target, setTarget] = useState({
+    ambulance: { lat: 17.21, lng: 78.21 },
+  });
 
-  const vehicles = [
-    { id: 1, lat: 17.2, lng: 78.2, type: "ambulance" },
-    { id: 2, lat: 17.25, lng: 78.25, type: "car" },
-  ];
-
+  // ✅ SIGNALS OK
   const signals = [
     { id: 1, lat: 17.22, lng: 78.22 },
     { id: 2, lat: 17.26, lng: 78.27 },
   ];
 
-  // 🔐 PROTECTED ROUTE (NO STATE BUG)
+  /* 🔐 PROTECTED ROUTE */
   function ProtectedRoute({ children }) {
     const token = localStorage.getItem("token");
-
-    if (!token) {
-      return <Navigate to="/login" replace />;
-    }
-
+    if (!token) return <Navigate to="/login" replace />;
     return children;
   }
 
-  // 🔓 PUBLIC ROUTE
+  /* 🔓 PUBLIC ROUTE */
   function PublicRoute({ children }) {
     const token = localStorage.getItem("token");
-
-    if (token) {
-      return <Navigate to="/" replace />;
-    }
-
+    if (token) return <Navigate to="/" replace />;
     return children;
   }
 
   return (
     <Router>
       <div style={{ display: "flex", height: "100vh" }}>
-        {/* ✅ Sidebar safe */}
         {localStorage.getItem("token") && <Sidebar />}
 
         <div style={{ flex: 1, padding: "20px" }}>
@@ -85,7 +75,7 @@ function App() {
               path="/"
               element={
                 <ProtectedRoute>
-                  <Dashboard vehicles={vehicles} signals={signals} />
+                  <Dashboard signals={signals} />
                 </ProtectedRoute>
               }
             />
@@ -95,11 +85,7 @@ function App() {
               path="/map"
               element={
                 <ProtectedRoute>
-                  <MapPage
-                    vehicles={vehicles}
-                    signals={signals}
-                    target={target}
-                  />
+                  <MapPage signals={signals} target={target} />
                 </ProtectedRoute>
               }
             />
@@ -109,7 +95,7 @@ function App() {
               path="/analytics"
               element={
                 <ProtectedRoute>
-                  <Analytics vehicles={vehicles} />
+                  <Analytics />
                 </ProtectedRoute>
               }
             />
@@ -129,12 +115,12 @@ function App() {
               path="/emergency"
               element={
                 <ProtectedRoute>
-                  <Emergency vehicles={vehicles} setTarget={setTarget} />
+                  <Emergency setTarget={setTarget} />
                 </ProtectedRoute>
               }
             />
 
-            {/* 🚑 TRACKING (VERY IMPORTANT) */}
+            {/* 🚑 TRACKING */}
             <Route
               path="/tracking"
               element={
