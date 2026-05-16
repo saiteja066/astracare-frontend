@@ -6,11 +6,6 @@ export default function Emergency({ setTarget }) {
   const navigate = useNavigate();
 
   const handleEmergency = () => {
-    if (!navigator.geolocation) {
-      alert("Geolocation not supported");
-      return;
-    }
-
     setLoading(true);
 
     navigator.geolocation.getCurrentPosition(
@@ -20,22 +15,20 @@ export default function Emergency({ setTarget }) {
           lng: pos.coords.longitude,
         };
 
-        // 🚑 ambulance spawn (near user)
         const ambulance = {
-          lat: user.lat + (Math.random() - 0.5) * 0.02,
-          lng: user.lng + (Math.random() - 0.5) * 0.02,
+          lat: user.lat + 0.01,
+          lng: user.lng + 0.01,
         };
 
-        // 🏥 dummy hospital (can replace later)
         const hospital = {
           lat: user.lat + 0.02,
           lng: user.lng + 0.02,
         };
 
-        // ✅ SET GLOBAL TARGET (for Map)
+        // ✅ GLOBAL STATE
         setTarget({ ambulance });
 
-        // ✅ STORE TRACKING DATA (IMPORTANT)
+        // ✅ STORE FOR TRACKING
         localStorage.setItem(
           "trackingData",
           JSON.stringify({
@@ -46,73 +39,21 @@ export default function Emergency({ setTarget }) {
         );
 
         setLoading(false);
-
-        // 🚀 go to tracking page
         navigate("/tracking");
       },
-      (err) => {
-        console.log("Geo error:", err);
-
-        // 🔥 fallback data (if GPS fails)
-        const user = { lat: 17.22, lng: 78.22 };
-        const ambulance = { lat: 17.23, lng: 78.23 };
-        const hospital = { lat: 17.25, lng: 78.25 };
-
-        setTarget({ ambulance });
-
-        localStorage.setItem(
-          "trackingData",
-          JSON.stringify({
-            user,
-            ambulance,
-            hospital,
-          }),
-        );
-
-        alert("Using default location");
-
+      () => {
+        alert("Location error");
         setLoading(false);
-        navigate("/tracking");
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
       },
     );
   };
 
   return (
     <div>
-      <h2 className="title">🚨 Emergency Assistance</h2>
-
-      <div
-        className="card"
-        style={{
-          textAlign: "center",
-          padding: "30px",
-        }}
-      >
-        <p style={{ marginBottom: "20px" }}>
-          Request ambulance to your current location
-        </p>
-
-        <button
-          onClick={handleEmergency}
-          disabled={loading}
-          style={{
-            padding: "15px 25px",
-            borderRadius: "12px",
-            border: "none",
-            background: "#ef4444",
-            color: "white",
-            fontSize: "16px",
-            fontWeight: "bold",
-            cursor: "pointer",
-          }}
-        >
-          {loading ? "Requesting..." : "🚑 Request Ambulance"}
-        </button>
-      </div>
+      <h2>🚨 Emergency</h2>
+      <button onClick={handleEmergency}>
+        {loading ? "..." : "🚑 Request Ambulance"}
+      </button>
     </div>
   );
 }
