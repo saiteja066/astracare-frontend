@@ -14,29 +14,11 @@ import "leaflet/dist/leaflet.css";
 const ambulanceIcon = new L.Icon({
   iconUrl: "https://cdn-icons-png.flaticon.com/512/2967/2967350.png",
   iconSize: [42, 42],
-  iconAnchor: [21, 42],
-});
-
-const carIcon = new L.Icon({
-  iconUrl: "https://cdn-icons-png.flaticon.com/512/744/744465.png",
-  iconSize: [28, 28],
-  iconAnchor: [14, 28],
 });
 
 const hospitalIcon = new L.Icon({
   iconUrl: "https://cdn-icons-png.flaticon.com/512/1484/1484842.png",
   iconSize: [36, 36],
-  iconAnchor: [18, 36],
-});
-
-const redSignal = new L.Icon({
-  iconUrl: "https://cdn-icons-png.flaticon.com/512/463/463612.png",
-  iconSize: [32, 32],
-});
-
-const greenSignal = new L.Icon({
-  iconUrl: "https://cdn-icons-png.flaticon.com/512/463/463626.png",
-  iconSize: [32, 32],
 });
 
 /* FOLLOW */
@@ -48,38 +30,42 @@ function Follow({ pos }) {
   return null;
 }
 
-/* DISTANCE */
-function getDistance(a, b) {
-  const dx = a[0] - b[0];
-  const dy = a[1] - b[1];
-  return Math.sqrt(dx * dx + dy * dy);
-}
-
 export default function MapView() {
   const [route, setRoute] = useState([]);
   const [ambulancePos, setAmbulancePos] = useState(null);
-  const [signals, setSignals] = useState([]);
-  const [vehicles, setVehicles] = useState([]);
-  const [arrived, setArrived] = useState(false);
-
-  /* 🏥 manual override */
   const [manualHospital, setManualHospital] = useState(null);
-  const [inputLat, setInputLat] = useState("");
-  const [inputLng, setInputLng] = useState("");
+
+  /* 🔎 SEARCH STATE */
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState([]);
 
   const ambIndex = useRef(0);
 
-  /* LOAD DATA */
+  /* 🔎 SEARCH API */
   useEffect(() => {
-    const data = JSON.parse(localStorage.getItem("trackingData"));
-    if (!data) return;
+    if (query.length < 3) {
+      setResults([]);
+      return;
+    }
 
-    const { hospital } = data;
+    const fetchHospitals = async () => {
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${query}`,
+        );
 
-    setManualHospital(hospital); // default
-  }, []);
+        const data = await res.json();
+        setResults(data);
+      } catch (err) {
+        console.log(err);
+      }
+    };
 
-  /* FETCH ROUTE */
+    const delay = setTimeout(fetchHospitals, 500); // debounce
+    return () => clearTimeout(delay);
+  }, [query]);
+
+  /* 🚀 FETCH ROUTE */
   useEffect(() => {
     const data = JSON.parse(localStorage.getItem("trackingData"));
     if (!data || !manualHospital) return;
@@ -93,6 +79,8 @@ export default function MapView() {
 
       const json = await res.json();
 
+      if (!json.routes?.length) return;
+
       const coords = json.routes[0].geometry.coordinates.map((c) => [
         c[1],
         c[0],
@@ -101,129 +89,91 @@ export default function MapView() {
       setRoute(coords);
       setAmbulancePos(coords[0]);
       ambIndex.current = 0;
-      setArrived(false);
-
-      const total = coords.length;
-
-      setSignals([
-        { index: Math.floor(total * 0.3), status: "red" },
-        { index: Math.floor(total * 0.6), status: "red" },
-      ]);
-
-      setVehicles([
-        { id: 1, index: Math.floor(total * 0.2) },
-        { id: 2, index: Math.floor(total * 0.5) },
-      ]);
     };
 
     fetchRoute();
   }, [manualHospital]);
 
-  /* 🚑 AMBULANCE */
+  /* 🚑 MOVE */
   useEffect(() => {
     if (!route.length) return;
 
     const interval = setInterval(() => {
       if (ambIndex.current >= route.length - 1) {
         clearInterval(interval);
-        setArrived(true);
-
-        setSignals((prev) => prev.map((s) => ({ ...s, status: "red" })));
         return;
       }
 
       ambIndex.current++;
-      const ambPos = route[ambIndex.current];
-      setAmbulancePos(ambPos);
-
-      /* 🚦 PRE-EMPTION */
-      setSignals((prev) =>
-        prev.map((s) => {
-          const signalPos = route[s.index];
-          if (!signalPos || !ambPos) return s;
-
-          const dist = getDistance(signalPos, ambPos);
-
-          if (dist < 0.005 && ambIndex.current < s.index) {
-            return { ...s, status: "green" };
-          }
-
-          if (ambIndex.current > s.index + 5) {
-            return { ...s, status: "red" };
-          }
-
-          return s;
-        }),
-      );
+      setAmbulancePos(route[ambIndex.current]);
     }, 150);
 
     return () => clearInterval(interval);
   }, [route]);
 
-  /* 🚗 VEHICLES */
-  useEffect(() => {
-    if (!route.length) return;
-
-    const interval = setInterval(() => {
-      setVehicles((prev) =>
-        prev.map((v) => {
-          const signalAhead = signals.find(
-            (s) => s.index > v.index && s.index - v.index < 5,
-          );
-
-          if (signalAhead && signalAhead.status === "red") {
-            return v;
-          }
-
-          return {
-            ...v,
-            index: (v.index + 1) % route.length,
-          };
-        }),
-      );
-    }, 200);
-
-    return () => clearInterval(interval);
-  }, [signals, route]);
-
-  /* 🏥 CHANGE HOSPITAL */
-  const updateHospital = () => {
-    if (!inputLat || !inputLng) return;
-
-    setManualHospital({
-      lat: parseFloat(inputLat),
-      lng: parseFloat(inputLng),
-    });
-  };
-
   return (
-    <div>
-      {/* 🏥 INPUT */}
-      <div style={{ marginBottom: "10px" }}>
+    <div style={{ padding: "10px" }}>
+      {/* 🔎 SEARCH BOX */}
+      <div style={{ position: "relative", maxWidth: "400px" }}>
         <input
-          placeholder="Hospital Lat"
-          value={inputLat}
-          onChange={(e) => setInputLat(e.target.value)}
+          type="text"
+          placeholder="Search Hospital..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          style={{
+            width: "100%",
+            padding: "12px",
+            borderRadius: "10px",
+            border: "1px solid #ccc",
+            outline: "none",
+            fontSize: "14px",
+          }}
         />
-        <input
-          placeholder="Hospital Lng"
-          value={inputLng}
-          onChange={(e) => setInputLng(e.target.value)}
-        />
-        <button onClick={updateHospital}>Change Hospital</button>
+
+        {/* RESULTS DROPDOWN */}
+        {results.length > 0 && (
+          <div
+            style={{
+              position: "absolute",
+              width: "100%",
+              background: "white",
+              border: "1px solid #ccc",
+              borderRadius: "10px",
+              marginTop: "5px",
+              maxHeight: "200px",
+              overflowY: "auto",
+              zIndex: 1000,
+            }}
+          >
+            {results.map((r, i) => (
+              <div
+                key={i}
+                onClick={() => {
+                  setManualHospital({
+                    lat: parseFloat(r.lat),
+                    lng: parseFloat(r.lon),
+                  });
+                  setQuery(r.display_name);
+                  setResults([]);
+                }}
+                style={{
+                  padding: "10px",
+                  cursor: "pointer",
+                  borderBottom: "1px solid #eee",
+                }}
+              >
+                {r.display_name}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* ARRIVAL */}
-      {arrived && (
-        <div style={{ background: "green", color: "white", padding: "10px" }}>
-          🚑 Reached Hospital
-        </div>
-      )}
-
+      {/* MAP */}
       <MapContainer
         center={[17.24, 78.24]}
-        zoom={14}
-        style={{ height: "500px" }}
+        zoom={13}
+        style={{ height: "500px", marginTop: "10px" }}
       >
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
@@ -240,7 +190,7 @@ export default function MapView() {
             position={[manualHospital.lat, manualHospital.lng]}
             icon={hospitalIcon}
           >
-            <Popup>🏥 Hospital</Popup>
+            <Popup>🏥 Selected Hospital</Popup>
           </Marker>
         )}
 
@@ -249,29 +199,6 @@ export default function MapView() {
           <Marker position={ambulancePos} icon={ambulanceIcon}>
             <Popup>🚑 Ambulance</Popup>
           </Marker>
-        )}
-
-        {/* VEHICLES */}
-        {vehicles.map(
-          (v) =>
-            route[v.index] && (
-              <Marker key={v.id} position={route[v.index]} icon={carIcon}>
-                <Popup>🚗 Vehicle</Popup>
-              </Marker>
-            ),
-        )}
-
-        {/* SIGNALS */}
-        {signals.map((s, i) =>
-          route[s.index] ? (
-            <Marker
-              key={i}
-              position={route[s.index]}
-              icon={s.status === "red" ? redSignal : greenSignal}
-            >
-              <Popup>🚦 {s.status.toUpperCase()}</Popup>
-            </Marker>
-          ) : null,
         )}
       </MapContainer>
     </div>
