@@ -6,6 +6,7 @@ import {
   Navigate,
 } from "react-router-dom";
 
+// Pages
 import Dashboard from "./pages/Dashboard";
 import MapPage from "./pages/MapPage";
 import Analytics from "./pages/Analytics";
@@ -17,27 +18,23 @@ import Register from "./pages/Register";
 import Sidebar from "./Sidebar";
 
 function App() {
+  /* 🚗 OPTIONAL TARGET (for MapPage if needed) */
   const [target, setTarget] = useState(null);
 
-  /* 🚗 STATIC VEHICLES (IMPORTANT) */
-  const vehicles = [
-    { id: 1, lat: 17.22, lng: 78.22 },
-    { id: 2, lat: 17.25, lng: 78.25 },
-    { id: 3, lat: 17.26, lng: 78.24 },
-  ];
-
-  /* 🚦 SIGNALS */
+  /* 🚦 SIGNALS (dummy but safe) */
   const signals = [
     { id: 1, lat: 17.22, lng: 78.22 },
     { id: 2, lat: 17.26, lng: 78.27 },
   ];
 
+  /* 🔐 PROTECTED ROUTE */
   function ProtectedRoute({ children }) {
     const token = localStorage.getItem("token");
     if (!token) return <Navigate to="/login" replace />;
     return children;
   }
 
+  /* 🔓 PUBLIC ROUTE */
   function PublicRoute({ children }) {
     const token = localStorage.getItem("token");
     if (token) return <Navigate to="/" replace />;
@@ -47,10 +44,12 @@ function App() {
   return (
     <Router>
       <div style={{ display: "flex", height: "100vh" }}>
+        {/* Sidebar only if logged in */}
         {localStorage.getItem("token") && <Sidebar />}
 
         <div style={{ flex: 1, padding: "20px" }}>
           <Routes>
+            {/* 🔓 AUTH */}
             <Route
               path="/login"
               element={
@@ -59,6 +58,7 @@ function App() {
                 </PublicRoute>
               }
             />
+
             <Route
               path="/register"
               element={
@@ -68,11 +68,12 @@ function App() {
               }
             />
 
+            {/* 🔐 MAIN PAGES */}
             <Route
               path="/"
               element={
                 <ProtectedRoute>
-                  <Dashboard vehicles={vehicles} signals={signals} />
+                  <Dashboard signals={signals} />
                 </ProtectedRoute>
               }
             />
@@ -81,11 +82,7 @@ function App() {
               path="/map"
               element={
                 <ProtectedRoute>
-                  <MapPage
-                    vehicles={vehicles}
-                    signals={signals}
-                    target={target}
-                  />
+                  <MapPage signals={signals} target={target} />
                 </ProtectedRoute>
               }
             />
@@ -94,7 +91,7 @@ function App() {
               path="/analytics"
               element={
                 <ProtectedRoute>
-                  <Analytics vehicles={vehicles} />
+                  <Analytics />
                 </ProtectedRoute>
               }
             />
@@ -126,6 +123,7 @@ function App() {
               }
             />
 
+            {/* 🔄 FALLBACK */}
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </div>

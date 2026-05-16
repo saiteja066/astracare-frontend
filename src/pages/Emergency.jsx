@@ -21,9 +21,7 @@ export default function Emergency() {
             "https://astracare-backend.onrender.com/api/hospitals/emergency",
             {
               method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
+              headers: { "Content-Type": "application/json" },
               body: JSON.stringify(user),
             },
           );
@@ -31,12 +29,12 @@ export default function Emergency() {
           const data = await res.json();
 
           if (!data.hospitals || data.hospitals.length === 0) {
-            alert("No hospitals found nearby");
+            alert("No hospitals found");
             setLoading(false);
             return;
           }
 
-          /* ✅ PICK NEAREST */
+          /* ✅ USE REAL HOSPITAL */
           const hospital = data.hospitals[0];
 
           /* 🚑 AMBULANCE STARTS FROM USER */
@@ -53,10 +51,11 @@ export default function Emergency() {
 
           localStorage.setItem("trackingData", JSON.stringify(trackingData));
 
+          /* 🔥 GO TO MAP */
           navigate("/map");
         } catch (err) {
           console.log(err);
-          alert("Error fetching hospital");
+          alert("Server error");
         }
 
         setLoading(false);

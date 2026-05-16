@@ -25,7 +25,7 @@ const hospitalIcon = new L.Icon({
   iconSize: [35, 35],
 });
 
-/* 🗺️ Auto follow ambulance */
+/* 🗺️ Follow ambulance */
 function MapUpdater({ position }) {
   const map = useMap();
 
@@ -40,28 +40,28 @@ function MapUpdater({ position }) {
 
 export default function Tracking() {
   const [data, setData] = useState(null);
-  const [ambulancePos, setAmbulancePos] = useState(null);
   const [route, setRoute] = useState([]);
-  const [eta, setEta] = useState("");
+  const [ambulancePos, setAmbulancePos] = useState(null);
   const [arrived, setArrived] = useState(false);
 
-  /* 📦 Load stored data */
+  /* 📦 Load data */
   useEffect(() => {
     const stored = JSON.parse(localStorage.getItem("trackingData"));
+
     if (stored) {
       setData(stored);
       setAmbulancePos([stored.ambulance.lat, stored.ambulance.lng]);
     }
   }, []);
 
-  /* 🛣️ Fetch route */
+  /* 🛣️ Get route */
   useEffect(() => {
     if (!data) return;
 
     const fetchRoute = async () => {
       try {
         const res = await fetch(
-          `https://router.project-osrm.org/route/v1/driving/${data.ambulance.lng},${data.ambulance.lat};${data.user.lng},${data.user.lat}?overview=full&geometries=geojson`,
+          `https://router.project-osrm.org/route/v1/driving/${data.ambulance.lng},${data.ambulance.lat};${data.hospital.lng},${data.hospital.lat}?overview=full&geometries=geojson`,
         );
 
         const result = await res.json();
@@ -73,19 +73,16 @@ export default function Tracking() {
           ]);
 
           setRoute(coords);
-
-          const time = result.routes[0].duration / 60;
-          setEta(time.toFixed(1) + " mins");
         }
       } catch (err) {
-        console.log("Route error", err);
+        console.log("Route error:", err);
       }
     };
 
     fetchRoute();
   }, [data]);
 
-  /* 🚑 Ambulance animation */
+  /* 🚑 Animate ambulance */
   useEffect(() => {
     if (!route.length) return;
 
@@ -97,12 +94,9 @@ export default function Tracking() {
         i++;
       } else {
         clearInterval(interval);
-
-        // ✅ ARRIVED
         setArrived(true);
-        setRoute([]); // remove route
       }
-    }, 300);
+    }, 200);
 
     return () => clearInterval(interval);
   }, [route]);
@@ -111,38 +105,11 @@ export default function Tracking() {
 
   return (
     <div>
-      <h2 className="title">🚑 Ambulance Tracking</h2>
+      <h2>🚑 Ambulance Tracking</h2>
 
-      {/* ✅ ARRIVAL MESSAGE */}
-      {arrived && (
-        <div
-          className="card"
-          style={{
-            background: "#16a34a",
-            color: "white",
-            textAlign: "center",
-            marginBottom: "10px",
-          }}
-        >
-          🚑 Ambulance has arrived!
-        </div>
-      )}
+      {arrived && <p style={{ color: "green" }}>✅ Ambulance Arrived!</p>}
 
-      {/* ⏱️ ETA */}
-      <div className="card" style={{ marginBottom: "15px" }}>
-        {arrived ? (
-          <b>✅ Arrived</b>
-        ) : (
-          <>
-            ⏱️ ETA: <b>{eta}</b>
-          </>
-        )}
-      </div>
-
-      {/* 🗺️ MAP */}
-      <div
-        style={{ height: "500px", borderRadius: "16px", overflow: "hidden" }}
-      >
+      <div style={{ height: "500px" }}>
         <MapContainer
           center={[data.user.lat, data.user.lng]}
           zoom={14}
@@ -167,12 +134,7 @@ export default function Tracking() {
           )}
 
           {/* 🛣️ ROUTE */}
-          {route.length > 0 && (
-            <Polyline
-              positions={route}
-              pathOptions={{ color: "#22c55e", weight: 5 }}
-            />
-          )}
+          {route.length > 0 && <Polyline positions={route} />}
         </MapContainer>
       </div>
     </div>

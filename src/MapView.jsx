@@ -2,17 +2,22 @@ import {
   MapContainer,
   TileLayer,
   Marker,
-  Popup,
   Polyline,
   useMap,
 } from "react-leaflet";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
+/* 🚑 Icons */
 const ambulanceIcon = new L.Icon({
   iconUrl: "https://cdn-icons-png.flaticon.com/512/2967/2967350.png",
   iconSize: [40, 40],
+});
+
+const userIcon = new L.Icon({
+  iconUrl: "https://cdn-icons-png.flaticon.com/512/64/64113.png",
+  iconSize: [30, 30],
 });
 
 const hospitalIcon = new L.Icon({
@@ -20,112 +25,118 @@ const hospitalIcon = new L.Icon({
   iconSize: [35, 35],
 });
 
-function Follow({ pos }) {
+/* 🗺️ Auto-follow ambulance */
+function Follow({ position }) {
   const map = useMap();
+
   useEffect(() => {
-    if (pos) map.flyTo(pos, 15);
-  }, [pos]);
+    if (position) {
+      map.flyTo(position, 15);
+    }
+  }, [position]);
+
   return null;
 }
 
 export default function MapView() {
+  const [data, setData] = useState(null);
   const [route, setRoute] = useState([]);
   const [ambulancePos, setAmbulancePos] = useState(null);
-  const [selectedHospital, setSelectedHospital] = useState(null);
+  const [arrived, setArrived] = useState(false);
 
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState([]);
-
-  const ambIndex = useRef(0);
-
-  const userLat = 17.385;
-  const userLng = 78.486;
-
+  /* 📦 Load tracking data */
   useEffect(() => {
-    if (query.length < 2) return;
+    const stored = JSON.parse(localStorage.getItem("trackingData"));
 
-    const fetchSearch = async () => {
+    if (stored) {
+      setData(stored);
+      setAmbulancePos([stored.ambulance.lat, stored.ambulance.lng]);
+    }
+  }, []);
+
+  /* 🛣️ Fetch route */
+  useEffect(() => {
+    if (!data) return;
+
+    const fetchRoute = async () => {
       try {
         const res = await fetch(
-          "https://astracare-backend.onrender.com/api/hospitals/search",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              lat: userLat,
-              lng: userLng,
-              query,
-            }),
-          },
+          `https://router.project-osrm.org/route/v1/driving/${data.ambulance.lng},${data.ambulance.lat};${data.hospital.lng},${data.hospital.lat}?overview=full&geometries=geojson`,
         );
 
-        const data = await res.json();
-        setResults(data.hospitals || []);
+        const result = await res.json();
+
+        if (result.routes?.length) {
+          const coords = result.routes[0].geometry.coordinates.map((c) => [
+            c[1],
+            c[0],
+          ]);
+
+          setRoute(coords);
+        }
       } catch (err) {
-        console.log(err);
+        console.log("Route error:", err);
       }
     };
 
-    const delay = setTimeout(fetchSearch, 400);
-    return () => clearTimeout(delay);
-  }, [query]);
+    fetchRoute();
+  }, [data]);
 
-  const createRoute = async (hospital) => {
-    const res = await fetch(
-      `https://router.project-osrm.org/route/v1/driving/${userLng},${userLat};${hospital.lng},${hospital.lat}?overview=full&geometries=geojson`,
-    );
-
-    const json = await res.json();
-
-    const coords = json.routes[0].geometry.coordinates.map((c) => [c[1], c[0]]);
-
-    setRoute(coords);
-    setAmbulancePos([userLat, userLng]);
-    ambIndex.current = 0;
-  };
-
+  /* 🚑 Animate ambulance */
   useEffect(() => {
     if (!route.length) return;
 
+    let i = 0;
+
     const interval = setInterval(() => {
-      if (ambIndex.current >= route.length - 1) return;
-      ambIndex.current++;
-      setAmbulancePos(route[ambIndex.current]);
-    }, 150);
+      if (i < route.length) {
+        setAmbulancePos(route[i]);
+        i++;
+      } else {
+        clearInterval(interval);
+        setArrived(true);
+      }
+    }, 200);
 
     return () => clearInterval(interval);
   }, [route]);
 
+  if (!data) return <h2>Loading map...</h2>;
+
   return (
-    <div style={{ padding: "20px" }}>
-      <input
-        placeholder="Search hospital..."
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-      />
+    <div>
+      <h2>🗺️ Live Ambulance Map</h2>
 
-      {results.map((r, i) => (
-        <div key={i} onClick={() => createRoute(r)}>
-          🏥 {r.name}
-        </div>
-      ))}
+      {arrived && <p style={{ color: "green" }}>✅ Ambulance Arrived</p>}
 
-      <MapContainer
-        center={[userLat, userLng]}
-        zoom={13}
-        style={{ height: "500px" }}
-      >
-        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-        <Follow pos={ambulancePos} />
+      <div style={{ height: "500px" }}>
+        <MapContainer
+          center={[data.user.lat, data.user.lng]}
+          zoom={14}
+          style={{ height: "100%" }}
+        >
+          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
-        {route.length > 0 && <Polyline positions={route} />}
+          <Follow position={ambulancePos} />
 
-        {ambulancePos && (
-          <Marker position={ambulancePos} icon={ambulanceIcon} />
-        )}
-      </MapContainer>
+          {/* 📍 USER */}
+          <Marker position={[data.user.lat, data.user.lng]} icon={userIcon} />
+
+          {/* 🏥 HOSPITAL */}
+          <Marker
+            position={[data.hospital.lat, data.hospital.lng]}
+            icon={hospitalIcon}
+          />
+
+          {/* 🚑 AMBULANCE */}
+          {ambulancePos && (
+            <Marker position={ambulancePos} icon={ambulanceIcon} />
+          )}
+
+          {/* 🛣️ ROUTE */}
+          {route.length > 0 && <Polyline positions={route} />}
+        </MapContainer>
+      </div>
     </div>
   );
 }
