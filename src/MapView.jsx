@@ -141,3 +141,6 @@ export default function MapView({ signals = [], target }) {
     </MapContainer>
   );
 }
+console.log("vehicles:", vehicles);
+console.log("signals:", signals);
+console.log("target:", target);
